@@ -1,8 +1,8 @@
 # SafeVision AI — Backend
 
-REST API in Python (FastAPI) for SafeVision AI. Stores events and alerts in PostgreSQL
-(the 7 tables from the project documentation), receives detections from the IoT module,
-and serves the data to the frontend.
+REST API in Python (FastAPI) for SafeVision AI. Reads and writes events and alerts in the
+team's Azure PostgreSQL database, receives detections from the IoT module, and serves the
+data to the frontend.
 
 ## Data structures
 
@@ -14,21 +14,45 @@ and serves the data to the frontend.
 The database is the source of truth; both structures are rebuilt from it on startup and
 kept in sync on every create/review.
 
+## Database
+
+The backend connects to the team's **Azure PostgreSQL** database (`safevisionai`), whose
+8 tables (`users`, `locations`, `cameras`, `zones`, `subjects`, `event_types`, `events`,
+`alerts`) are created by `01_tables.sql` and owned by `safevision_admin`. The backend
+**never creates or alters tables** and inserts no seed data: it connects as
+`app_safevision`, which only has SELECT/INSERT/UPDATE/DELETE.
+
+Database values are in English; the API translates them to the Spanish labels the
+frontend uses:
+
+| Database | Frontend |
+|---|---|
+| `events.status` pending / in_review | Pendiente |
+| `events.status` resolved / false_alarm | Revisado |
+| `event_types.severity_level` 3–4 / 2 / 1 | Alto / Medio / Bajo |
+
+Reviewing an event sets `events.status = 'resolved'` and closes its open alerts
+(`status = 'resolved'`, `attended_at = now()`).
+
 ## Run locally
+
+Your public IP must be allowed in the Azure firewall first.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+.venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
+copy .env.example .env             # macOS/Linux: cp .env.example .env
+# edit .env with the real password (URL-encoded: ! -> %21)
 uvicorn app.main:app --reload
 ```
 
-Without `DATABASE_URL` it uses a local SQLite file. Interactive docs: http://localhost:8000/docs
+Interactive docs: http://localhost:8000/docs
 
 Send a test event (simulates the IoT module):
 
 ```bash
-python scripts/simulate_event.py --tipo "Caída"
+python scripts/simulate_event.py --key YOUR_IOT_API_KEY
 ```
 
 ## Endpoints
@@ -43,8 +67,8 @@ python scripts/simulate_event.py --tipo "Caída"
 | PATCH | `/api/eventos/{id}/revisar` | Frontend (review button) |
 | GET | `/api/alertas/pendientes?limit=` | Frontend (priority-queue order) |
 | GET | `/api/metricas` | Frontend (metric cards) |
-| GET/POST | `/api/tipos-evento`, `/api/ubicaciones`, `/api/camaras`, `/api/sujetos` | Catalogs |
-| PATCH | `/api/camaras/{id}/estado` (header `X-API-Key`) | IoT module (camera heartbeat) |
+| GET | `/api/tipos-evento`, `/api/ubicaciones`, `/api/camaras`, `/api/zonas`, `/api/sujetos` | Catalogs (read only) |
+| PATCH | `/api/camaras/{id}/estado` (header `X-API-Key`) | IoT module (camera status) |
 
 ### IoT contract
 
@@ -53,27 +77,39 @@ POST /api/eventos
 X-API-Key: <IOT_API_KEY>
 Content-Type: application/json
 
-{ "id_camara": 1, "id_sujeto": 1, "tipo_evento": "Caída", "descripcion": "optional" }
+{
+  "camera_id": 1,
+  "event_type": "Caída",
+  "subject_id": null,
+  "zone_id": null,
+  "detected_class": "person",
+  "confidence": 0.93,
+  "evidence_url": null,
+  "description": "optional"
+}
 ```
 
-`tipo_evento` (name) or `id_tipo_evento` (id). The server sets date and time.
+`event_type` (name, case-insensitive) or `event_type_id`. `detected_class` is one of
+person, dog, cat, other_animal. `confidence` is 0–1. `zone_id` must belong to the camera.
+The database sets `occurred_at`; an alert with `level = severity_level` is created too.
+
+Camera status: `PATCH /api/camaras/{id}/estado` with `{"status": "active"}`
+(active, inactive, disconnected, maintenance).
 
 ## Environment variables
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL URL. Empty = local SQLite. |
+| `DATABASE_URL` | Azure PostgreSQL URL with `?sslmode=require`. Required. |
 | `IOT_API_KEY` | Key required to create events. Empty = no check (local only). |
 | `FRONTEND_ORIGINS` | Allowed CORS origins, comma separated. |
 | `TIMEZONE` | Default `America/Bogota`. |
-| `SEED_DEMO_EVENTS` | `true` seeds 5 sample events on the first start. |
 
 ## Deploy on Render
 
-1. Push this repo to GitHub.
-2. Render → New → Blueprint → select this repo. `render.yaml` creates the web service and the database.
-3. When asked, set `FRONTEND_ORIGINS` to the Vercel URL (e.g. `https://safevisionai.vercel.app`).
-4. After deploy, copy `IOT_API_KEY` from the service's Environment tab for the IoT module.
+1. Push to GitHub; Render redeploys automatically.
+2. In the service's environment variables, set `DATABASE_URL` to the Azure URL.
+3. Add the service's outbound IPs (Connect → Outbound) as firewall rules in Azure.
 
-Free plan notes: the service sleeps after 15 minutes without traffic and takes about a
-minute to wake up; the free database expires 30 days after creation.
+Free plan note: the service sleeps after 15 minutes without traffic and takes about a
+minute to wake up.

@@ -1,78 +1,99 @@
-"""The 7 tables from the SafeVision AI documentation (section 14)."""
-from datetime import date, time
+"""Mapping of the team's Azure PostgreSQL schema (01_tables.sql).
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text, Time
+The tables already exist and are owned by safevision_admin. This backend never
+creates or alters them; it only reads and writes rows.
+"""
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import (BigInteger, Boolean, DateTime, FetchedValue, ForeignKey, Numeric,
+                        SmallInteger, String, Text)
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 
-class Usuario(Base):
-    __tablename__ = "usuario"
-    id_usuario: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(100))
-    correo: Mapped[str] = mapped_column(String(150), unique=True)
-    contrasena: Mapped[str] = mapped_column(String(255))  # stored as a PBKDF2 hash
+class User(Base):
+    __tablename__ = "users"
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    email: Mapped[str] = mapped_column(String)
+    password_hash: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=FetchedValue())
 
 
-class Ubicacion(Base):
-    __tablename__ = "ubicacion"
-    id_ubicacion: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(100))
-    descripcion: Mapped[str | None] = mapped_column(Text)
-    id_usuario: Mapped[int] = mapped_column(ForeignKey("usuario.id_usuario"))
+class Location(Base):
+    __tablename__ = "locations"
+    location_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"))
 
 
-class Camara(Base):
-    __tablename__ = "camara"
-    id_camara: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(100))
-    direccion_ip: Mapped[str | None] = mapped_column(String(45))
-    estado: Mapped[str] = mapped_column(String(30), default="Sin conexión")
-    id_ubicacion: Mapped[int] = mapped_column(ForeignKey("ubicacion.id_ubicacion"))
-    ubicacion: Mapped[Ubicacion] = relationship()
+class Camera(Base):
+    __tablename__ = "cameras"
+    camera_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    ip_address: Mapped[str] = mapped_column(INET)
+    status: Mapped[str] = mapped_column(String, server_default=FetchedValue())  # active, inactive, disconnected, maintenance
+    location_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("locations.location_id"))
+    location: Mapped[Location] = relationship()
 
 
-class Sujeto(Base):
-    __tablename__ = "sujeto"
-    id_sujeto: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(100))
-    tipo: Mapped[str] = mapped_column(String(30))  # Persona, Niño, Adulto mayor, Mascota
-    descripcion: Mapped[str | None] = mapped_column(Text)
-    id_usuario: Mapped[int] = mapped_column(ForeignKey("usuario.id_usuario"))
+class Zone(Base):
+    __tablename__ = "zones"
+    zone_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text)
+    coordinates: Mapped[list] = mapped_column(JSONB)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=FetchedValue())
+    camera_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cameras.camera_id"))
 
 
-class TipoEvento(Base):
-    __tablename__ = "tipo_evento"
-    id_tipo_evento: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(100), unique=True)
-    descripcion: Mapped[str | None] = mapped_column(Text)
-    nivel_severidad: Mapped[int] = mapped_column(Integer)  # 1 Bajo, 2 Medio, 3 Alto
+class Subject(Base):
+    __tablename__ = "subjects"
+    subject_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    subject_type: Mapped[str] = mapped_column(String)  # person, child, elderly, pet
+    description: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"))
 
 
-class Evento(Base):
-    __tablename__ = "evento"
-    id_evento: Mapped[int] = mapped_column(primary_key=True)
-    fecha: Mapped[date] = mapped_column(Date)
-    hora: Mapped[time] = mapped_column(Time)
-    descripcion: Mapped[str | None] = mapped_column(Text)
-    estado: Mapped[str] = mapped_column(String(20), default="Pendiente")  # Pendiente / Revisado
-    id_sujeto: Mapped[int] = mapped_column(ForeignKey("sujeto.id_sujeto"))
-    id_tipo_evento: Mapped[int] = mapped_column(ForeignKey("tipo_evento.id_tipo_evento"))
-    id_camara: Mapped[int] = mapped_column(ForeignKey("camara.id_camara"))
-
-    sujeto: Mapped[Sujeto] = relationship()
-    tipo_evento: Mapped[TipoEvento] = relationship()
-    camara: Mapped[Camara] = relationship()
-    alertas: Mapped[list["Alerta"]] = relationship(back_populates="evento")
+class EventType(Base):
+    __tablename__ = "event_types"
+    event_type_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text)
+    severity_level: Mapped[int] = mapped_column(SmallInteger)  # 1..4
 
 
-class Alerta(Base):
-    __tablename__ = "alerta"
-    id_alerta: Mapped[int] = mapped_column(primary_key=True)
-    fecha: Mapped[date] = mapped_column(Date)
-    hora: Mapped[time] = mapped_column(Time)
-    nivel: Mapped[str] = mapped_column(String(10))  # Alto / Medio / Bajo
-    estado: Mapped[str] = mapped_column(String(20), default="Pendiente")  # Pendiente / Atendida
-    id_evento: Mapped[int] = mapped_column(ForeignKey("evento.id_evento"))
-    evento: Mapped[Evento] = relationship(back_populates="alertas")
+class Event(Base):
+    __tablename__ = "events"
+    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=FetchedValue())
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String, server_default=FetchedValue())  # pending, in_review, resolved, false_alarm
+    detected_class: Mapped[str] = mapped_column(String, server_default=FetchedValue())  # person, dog, cat, other_animal
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric)
+    evidence_url: Mapped[str | None] = mapped_column(String)
+    subject_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("subjects.subject_id"))
+    event_type_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("event_types.event_type_id"))
+    camera_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cameras.camera_id"))
+    zone_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("zones.zone_id"))
+
+    subject: Mapped[Subject | None] = relationship()
+    event_type: Mapped[EventType] = relationship()
+    camera: Mapped[Camera] = relationship()
+    zone: Mapped[Zone | None] = relationship()
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+    alert_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=FetchedValue())
+    level: Mapped[int] = mapped_column(SmallInteger)  # 1..4
+    status: Mapped[str] = mapped_column(String, server_default=FetchedValue())  # active, seen, resolved, dismissed
+    attended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attended_by_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"))
+    event_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("events.event_id"))

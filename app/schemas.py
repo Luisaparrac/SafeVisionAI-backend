@@ -1,8 +1,10 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class EventView(BaseModel):
-    """Exactly the shape the frontend's RiskEvent uses."""
+    """Exactly the shape the frontend's RiskEvent uses (UI values in Spanish)."""
     id: int
     type: str
     subject: str
@@ -24,11 +26,15 @@ class AlertView(BaseModel):
 
 class EventCreate(BaseModel):
     """What the IoT module sends when it detects something."""
-    id_camara: int
-    id_sujeto: int
-    id_tipo_evento: int | None = None
-    tipo_evento: str | None = Field(None, description="Type name, alternative to id_tipo_evento")
-    descripcion: str | None = None
+    camera_id: int
+    event_type_id: int | None = None
+    event_type: str | None = Field(None, description="Event type name, alternative to event_type_id")
+    subject_id: int | None = None
+    zone_id: int | None = None
+    detected_class: Literal["person", "dog", "cat", "other_animal"] = "person"
+    confidence: float | None = Field(None, ge=0, le=1)
+    evidence_url: str | None = None
+    description: str | None = None
 
 
 class Metrics(BaseModel):
@@ -37,31 +43,5 @@ class Metrics(BaseModel):
     alto: int
 
 
-class UbicacionIn(BaseModel):
-    nombre: str
-    descripcion: str | None = None
-    id_usuario: int
-
-
-class CamaraIn(BaseModel):
-    nombre: str
-    direccion_ip: str | None = None
-    estado: str = "Sin conexión"
-    id_ubicacion: int
-
-
-class CamaraEstado(BaseModel):
-    estado: str
-
-
-class SujetoIn(BaseModel):
-    nombre: str
-    tipo: str
-    descripcion: str | None = None
-    id_usuario: int
-
-
-class TipoEventoIn(BaseModel):
-    nombre: str
-    descripcion: str | None = None
-    nivel_severidad: int = Field(ge=1, le=3)
+class CameraStatus(BaseModel):
+    status: Literal["active", "inactive", "disconnected", "maintenance"]

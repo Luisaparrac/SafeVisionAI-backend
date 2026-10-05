@@ -6,23 +6,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import config, services
-from app.database import Base, SessionLocal, engine, get_db
-from app.models import Camara, Sujeto, TipoEvento, Ubicacion, Usuario
-from app.schemas import (AlertView, CamaraEstado, CamaraIn, EventCreate, EventView, Metrics,
-                         SujetoIn, TipoEventoIn, UbicacionIn)
-from app.seed import seed
+from app.database import SessionLocal, get_db
+from app.models import Camera, EventType, Location, Subject, Zone
+from app.schemas import AlertView, CameraStatus, EventCreate, EventView, Metrics
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(engine)
+    # Tables already exist in Azure: no create_all, no seed. Only load the structures.
     with SessionLocal() as db:
-        seed(db)
         services.rebuild_structures(db)
     yield
 
 
-app = FastAPI(title="SafeVision AI - Backend", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="SafeVision AI - Backend", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,70 +86,57 @@ def metrics(db: Session = Depends(get_db)):
     return services.metrics(db)
 
 
-# ---------- Catalogs ----------
+# ---------- Catalogs (read only) ----------
 @app.get("/api/tipos-evento")
 def list_event_types(db: Session = Depends(get_db)):
-    return db.scalars(select(TipoEvento).order_by(TipoEvento.nivel_severidad.desc())).all()
-
-
-@app.post("/api/tipos-evento", status_code=201)
-def create_event_type(data: TipoEventoIn, db: Session = Depends(get_db)):
-    item = TipoEvento(**data.model_dump())
-    db.add(item)
-    db.commit()
-    return item
+    rows = db.scalars(select(EventType).order_by(EventType.severity_level.desc(), EventType.name))
+    return [
+        {"event_type_id": t.event_type_id, "name": t.name, "description": t.description,
+         "severity_level": t.severity_level, "priority": services.priority_label(t.severity_level)}
+        for t in rows
+    ]
 
 
 @app.get("/api/ubicaciones")
 def list_locations(db: Session = Depends(get_db)):
-    return db.scalars(select(Ubicacion)).all()
-
-
-@app.post("/api/ubicaciones", status_code=201)
-def create_location(data: UbicacionIn, db: Session = Depends(get_db)):
-    if db.get(Usuario, data.id_usuario) is None:
-        raise HTTPException(404, "Usuario no existe")
-    item = Ubicacion(**data.model_dump())
-    db.add(item)
-    db.commit()
-    return item
+    return [
+        {"location_id": l.location_id, "name": l.name, "description": l.description}
+        for l in db.scalars(select(Location).order_by(Location.location_id))
+    ]
 
 
 @app.get("/api/camaras")
 def list_cameras(db: Session = Depends(get_db)):
-    return db.scalars(select(Camara)).all()
-
-
-@app.post("/api/camaras", status_code=201)
-def create_camera(data: CamaraIn, db: Session = Depends(get_db)):
-    if db.get(Ubicacion, data.id_ubicacion) is None:
-        raise HTTPException(404, "Ubicación no existe")
-    item = Camara(**data.model_dump())
-    db.add(item)
-    db.commit()
-    return item
+    return [
+        {"camera_id": c.camera_id, "name": c.name, "ip_address": str(c.ip_address),
+         "status": c.status, "location_id": c.location_id}
+        for c in db.scalars(select(Camera).order_by(Camera.camera_id))
+    ]
 
 
 @app.patch("/api/camaras/{camera_id}/estado", dependencies=[Depends(require_iot_key)])
-def update_camera_status(camera_id: int, data: CamaraEstado, db: Session = Depends(get_db)):
-    camera = db.get(Camara, camera_id)
+def update_camera_status(camera_id: int, data: CameraStatus, db: Session = Depends(get_db)):
+    camera = db.get(Camera, camera_id)
     if camera is None:
         raise HTTPException(404, "Cámara no existe")
-    camera.estado = data.estado
+    camera.status = data.status
     db.commit()
-    return camera
+    return {"camera_id": camera.camera_id, "status": camera.status}
+
+
+@app.get("/api/zonas")
+def list_zones(db: Session = Depends(get_db)):
+    return [
+        {"zone_id": z.zone_id, "name": z.name, "description": z.description,
+         "coordinates": z.coordinates, "is_active": z.is_active, "camera_id": z.camera_id}
+        for z in db.scalars(select(Zone).order_by(Zone.zone_id))
+    ]
 
 
 @app.get("/api/sujetos")
 def list_subjects(db: Session = Depends(get_db)):
-    return db.scalars(select(Sujeto)).all()
-
-
-@app.post("/api/sujetos", status_code=201)
-def create_subject(data: SujetoIn, db: Session = Depends(get_db)):
-    if db.get(Usuario, data.id_usuario) is None:
-        raise HTTPException(404, "Usuario no existe")
-    item = Sujeto(**data.model_dump())
-    db.add(item)
-    db.commit()
-    return item
+    return [
+        {"subject_id": s.subject_id, "name": s.name, "subject_type": s.subject_type,
+         "description": s.description}
+        for s in db.scalars(select(Subject).order_by(Subject.subject_id))
+    ]

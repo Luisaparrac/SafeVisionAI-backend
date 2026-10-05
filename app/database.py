@@ -5,9 +5,11 @@ from app.config import DATABASE_URL
 
 
 def normalize_url(url: str) -> str:
-    """Render gives 'postgres://' or 'postgresql://'; SQLAlchemy needs the psycopg driver."""
+    """Accepts 'postgres://' or 'postgresql://' and selects the psycopg 3 driver."""
     if not url:
-        return "sqlite:///./safevision.db"
+        raise RuntimeError(
+            "DATABASE_URL is not set. Copy .env.example to .env and fill in the Azure connection."
+        )
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://"):]
     if url.startswith("postgresql://"):
@@ -15,9 +17,7 @@ def normalize_url(url: str) -> str:
     return url
 
 
-url = normalize_url(DATABASE_URL)
-connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
+engine = create_engine(normalize_url(DATABASE_URL), pool_pre_ping=True, pool_recycle=1800)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

@@ -10,20 +10,10 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: DATABASE_URL
-        fromDatabase:
-          name: safevision-db
-          property: connectionString
+        sync: false
       - key: IOT_API_KEY
         generateValue: true
       - key: FRONTEND_ORIGINS
         sync: false
       - key: TIMEZONE
         value: America/Bogota
-      - key: SEED_DEMO_EVENTS
-        value: "true"
-
-databases:
-  - name: safevision-db
-    plan: free
-    databaseName: safevision
-    user: safevision
