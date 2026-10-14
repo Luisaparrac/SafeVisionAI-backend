@@ -7,6 +7,7 @@ when the surrounding unit of work commits.
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from safevision.domain.model.alert import Alert
 from safevision.domain.model.event import Event
 from safevision.domain.model.values import EventStatus
 
@@ -39,4 +40,23 @@ class EventRepository(Protocol):
 
     def count(self, criteria: EventFilter) -> int:
         """Number of matching events."""
+        ...
+
+
+@runtime_checkable
+class AlertRepository(Protocol):
+    def get(self, alert_id: int) -> Alert | None:
+        """The alert with that id, or None."""
+        ...
+
+    def add(self, alert: Alert) -> Alert:
+        """Stores a new alert and returns it with its assigned id."""
+        ...
+
+    def update(self, alert: Alert) -> None:
+        """Saves the changes of an existing alert (raises NotFoundError if missing)."""
+        ...
+
+    def find_by_event(self, event_id: int) -> list[Alert]:
+        """Alerts raised for an event, oldest first (by id)."""
         ...

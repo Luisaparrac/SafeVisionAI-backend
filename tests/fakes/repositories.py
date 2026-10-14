@@ -8,6 +8,7 @@ import copy
 
 from safevision.application.ports.repositories import EventFilter
 from safevision.domain.errors import NotFoundError
+from safevision.domain.model.alert import Alert
 from safevision.domain.model.event import Event
 
 
@@ -66,3 +67,11 @@ class InMemoryEventRepository(InMemoryStore[Event]):
         if criteria.statuses is not None and event.status not in criteria.statuses:
             return False
         return criteria.event_type_ids is None or event.event_type_id in criteria.event_type_ids
+
+
+class InMemoryAlertRepository(InMemoryStore[Alert]):
+    def __init__(self) -> None:
+        super().__init__("Alerta")
+
+    def find_by_event(self, event_id: int) -> list[Alert]:
+        return [alert for alert in self.all() if alert.event_id == event_id]
