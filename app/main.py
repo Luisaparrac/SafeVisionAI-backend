@@ -33,7 +33,7 @@ app.add_middleware(
 def require_iot_key(x_api_key: str | None = Header(default=None)) -> None:
     # Constant-time comparison so the key cannot be guessed from response timings.
     provided = (x_api_key or "").encode()
-    if config.IOT_API_KEY and not hmac.compare_digest(provided, config.IOT_API_KEY.encode()):
+    if not hmac.compare_digest(provided, config.IOT_API_KEY.encode()):
         raise HTTPException(401, "X-API-Key inválida")
 
 

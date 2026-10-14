@@ -100,7 +100,7 @@ Camera status: `PATCH /api/camaras/{id}/estado` with `{"status": "active"}`
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | PostgreSQL URL with `?sslmode=require`. Required. |
-| `IOT_API_KEY` | Key required to create events. Empty = no check (local only). |
+| `IOT_API_KEY` | Key required to create events and update camera status. Required: the app does not start without it. |
 | `FRONTEND_ORIGINS` | Allowed CORS origins, comma separated. |
 | `TIMEZONE` | Default `America/Bogota`. |
 
