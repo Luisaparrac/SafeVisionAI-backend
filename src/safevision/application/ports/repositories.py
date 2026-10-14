@@ -11,6 +11,8 @@ from safevision.domain.model.alert import Alert
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
+from safevision.domain.model.location import Location
+from safevision.domain.model.subject import Subject
 from safevision.domain.model.values import EventStatus
 from safevision.domain.model.zone import Zone
 
@@ -98,4 +100,21 @@ class CameraRepository(Protocol):
 
     def list_zones(self) -> list[Zone]:
         """All zones ordered by id."""
+        ...
+
+
+@runtime_checkable
+class CatalogRepository(Protocol):
+    """Read-only catalogs of locations and monitored subjects."""
+
+    def get_location(self, location_id: int) -> Location | None: ...
+
+    def list_locations(self) -> list[Location]:
+        """All locations ordered by id."""
+        ...
+
+    def get_subject(self, subject_id: int) -> Subject | None: ...
+
+    def list_subjects(self) -> list[Subject]:
+        """All subjects ordered by id."""
         ...

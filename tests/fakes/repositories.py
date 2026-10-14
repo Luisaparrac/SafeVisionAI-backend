@@ -12,6 +12,8 @@ from safevision.domain.model.alert import Alert
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
+from safevision.domain.model.location import Location
+from safevision.domain.model.subject import Subject
 from safevision.domain.model.zone import Zone
 
 
@@ -112,3 +114,29 @@ class InMemoryCameraRepository(InMemoryStore[Camera]):
         cameras, zones = state
         super().restore(cameras)
         self.zones.restore(zones)
+
+
+class InMemoryCatalogRepository:
+    def __init__(self) -> None:
+        self.locations: InMemoryStore[Location] = InMemoryStore("Ubicación")
+        self.subjects: InMemoryStore[Subject] = InMemoryStore("Sujeto")
+
+    def get_location(self, location_id: int) -> Location | None:
+        return self.locations.get(location_id)
+
+    def list_locations(self) -> list[Location]:
+        return self.locations.all()
+
+    def get_subject(self, subject_id: int) -> Subject | None:
+        return self.subjects.get(subject_id)
+
+    def list_subjects(self) -> list[Subject]:
+        return self.subjects.all()
+
+    def snapshot(self):
+        return self.locations.snapshot(), self.subjects.snapshot()
+
+    def restore(self, state) -> None:
+        locations, subjects = state
+        self.locations.restore(locations)
+        self.subjects.restore(subjects)
