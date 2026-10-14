@@ -175,3 +175,24 @@ _ALERT_TRANSITIONS = {
     AlertStatus.RESOLVED: frozenset(),
     AlertStatus.DISMISSED: frozenset(),
 }
+
+
+class DetectedClass(_ParsableEnum):
+    """What the IoT vision model detected."""
+
+    PERSON = "person"
+    DOG = "dog"
+    CAT = "cat"
+    OTHER_ANIMAL = "other_animal"
+
+    @property
+    def label(self) -> str:
+        return _CLASS_LABELS[self]
+
+
+_CLASS_LABELS = {
+    DetectedClass.PERSON: "Persona",
+    DetectedClass.DOG: "Perro",
+    DetectedClass.CAT: "Gato",
+    DetectedClass.OTHER_ANIMAL: "Animal",
+}
