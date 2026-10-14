@@ -1,0 +1,68 @@
+"""In-memory implementations of the repository ports, for tests only.
+
+Entities are copied on the way in and out, so a use case that forgets to call
+``update`` does not see its changes stored by accident.
+"""
+
+import copy
+
+from safevision.application.ports.repositories import EventFilter
+from safevision.domain.errors import NotFoundError
+from safevision.domain.model.event import Event
+
+
+class InMemoryStore[T]:
+    """Rows by id with auto-increment, plus snapshot/restore for rollbacks."""
+
+    def __init__(self, entity_name: str) -> None:
+        self._entity_name = entity_name
+        self._rows: dict[int, T] = {}
+        self._next_id = 1
+
+    def get(self, entity_id: int) -> T | None:
+        row = self._rows.get(entity_id)
+        return copy.deepcopy(row)
+
+    def add(self, entity: T) -> T:
+        stored = copy.deepcopy(entity)
+        if stored.id is None:
+            stored.id = self._next_id
+        elif stored.id in self._rows:
+            raise ValueError(f"duplicate id {stored.id}")
+        self._next_id = max(self._next_id, stored.id + 1)
+        self._rows[stored.id] = stored
+        return copy.deepcopy(stored)
+
+    def update(self, entity: T) -> None:
+        if entity.id not in self._rows:
+            raise NotFoundError(self._entity_name, entity.id)
+        self._rows[entity.id] = copy.deepcopy(entity)
+
+    def all(self) -> list[T]:
+        return [copy.deepcopy(row) for _, row in sorted(self._rows.items())]
+
+    def snapshot(self) -> tuple[dict[int, T], int]:
+        return copy.deepcopy(self._rows), self._next_id
+
+    def restore(self, state: tuple[dict[int, T], int]) -> None:
+        rows, self._next_id = state
+        self._rows = copy.deepcopy(rows)
+
+
+class InMemoryEventRepository(InMemoryStore[Event]):
+    def __init__(self) -> None:
+        super().__init__("Evento")
+
+    def find(self, criteria: EventFilter, limit: int | None = None) -> list[Event]:
+        rows = [event for event in self.all() if self._matches(event, criteria)]
+        rows.sort(key=lambda e: (e.occurred_at, e.id), reverse=True)
+        return rows if limit is None else rows[:limit]
+
+    def count(self, criteria: EventFilter) -> int:
+        return len(self.find(criteria))
+
+    @staticmethod
+    def _matches(event: Event, criteria: EventFilter) -> bool:
+        if criteria.statuses is not None and event.status not in criteria.statuses:
+            return False
+        return criteria.event_type_ids is None or event.event_type_id in criteria.event_type_ids
