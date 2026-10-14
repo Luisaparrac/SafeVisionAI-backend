@@ -110,8 +110,8 @@ def list_event_types(db: Session = Depends(get_db)):
 @app.get("/api/ubicaciones")
 def list_locations(db: Session = Depends(get_db)):
     return [
-        {"location_id": l.location_id, "name": l.name, "description": l.description}
-        for l in db.scalars(select(Location).order_by(Location.location_id))
+        {"location_id": loc.location_id, "name": loc.name, "description": loc.description}
+        for loc in db.scalars(select(Location).order_by(Location.location_id))
     ]
 
 
