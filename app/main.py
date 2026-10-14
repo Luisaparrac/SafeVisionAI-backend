@@ -1,3 +1,4 @@
+import hmac
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -13,7 +14,7 @@ from app.schemas import AlertView, CameraStatus, EventCreate, EventView, Metrics
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Tables already exist in Azure: no create_all, no seed. Only load the structures.
+    # Tables already exist in the database: no create_all, no seed. Only load the structures.
     with SessionLocal() as db:
         services.rebuild_structures(db)
     yield
@@ -30,7 +31,9 @@ app.add_middleware(
 
 
 def require_iot_key(x_api_key: str | None = Header(default=None)) -> None:
-    if config.IOT_API_KEY and x_api_key != config.IOT_API_KEY:
+    # Constant-time comparison so the key cannot be guessed from response timings.
+    provided = (x_api_key or "").encode()
+    if not hmac.compare_digest(provided, config.IOT_API_KEY.encode()):
         raise HTTPException(401, "X-API-Key inválida")
 
 
@@ -65,7 +68,12 @@ def get_event(event_id: int, db: Session = Depends(get_db)):
     return services.to_view(services.get_event(db, event_id))
 
 
-@app.post("/api/eventos", response_model=EventView, status_code=201, dependencies=[Depends(require_iot_key)])
+@app.post(
+    "/api/eventos",
+    response_model=EventView,
+    status_code=201,
+    dependencies=[Depends(require_iot_key)],
+)
 def create_event(data: EventCreate, db: Session = Depends(get_db)):
     return services.create_event(db, data)
 
@@ -91,8 +99,13 @@ def metrics(db: Session = Depends(get_db)):
 def list_event_types(db: Session = Depends(get_db)):
     rows = db.scalars(select(EventType).order_by(EventType.severity_level.desc(), EventType.name))
     return [
-        {"event_type_id": t.event_type_id, "name": t.name, "description": t.description,
-         "severity_level": t.severity_level, "priority": services.priority_label(t.severity_level)}
+        {
+            "event_type_id": t.event_type_id,
+            "name": t.name,
+            "description": t.description,
+            "severity_level": t.severity_level,
+            "priority": services.priority_label(t.severity_level),
+        }
         for t in rows
     ]
 
@@ -100,16 +113,21 @@ def list_event_types(db: Session = Depends(get_db)):
 @app.get("/api/ubicaciones")
 def list_locations(db: Session = Depends(get_db)):
     return [
-        {"location_id": l.location_id, "name": l.name, "description": l.description}
-        for l in db.scalars(select(Location).order_by(Location.location_id))
+        {"location_id": loc.location_id, "name": loc.name, "description": loc.description}
+        for loc in db.scalars(select(Location).order_by(Location.location_id))
     ]
 
 
 @app.get("/api/camaras")
 def list_cameras(db: Session = Depends(get_db)):
     return [
-        {"camera_id": c.camera_id, "name": c.name, "ip_address": str(c.ip_address),
-         "status": c.status, "location_id": c.location_id}
+        {
+            "camera_id": c.camera_id,
+            "name": c.name,
+            "ip_address": str(c.ip_address),
+            "status": c.status,
+            "location_id": c.location_id,
+        }
         for c in db.scalars(select(Camera).order_by(Camera.camera_id))
     ]
 
@@ -127,8 +145,14 @@ def update_camera_status(camera_id: int, data: CameraStatus, db: Session = Depen
 @app.get("/api/zonas")
 def list_zones(db: Session = Depends(get_db)):
     return [
-        {"zone_id": z.zone_id, "name": z.name, "description": z.description,
-         "coordinates": z.coordinates, "is_active": z.is_active, "camera_id": z.camera_id}
+        {
+            "zone_id": z.zone_id,
+            "name": z.name,
+            "description": z.description,
+            "coordinates": z.coordinates,
+            "is_active": z.is_active,
+            "camera_id": z.camera_id,
+        }
         for z in db.scalars(select(Zone).order_by(Zone.zone_id))
     ]
 
@@ -136,7 +160,11 @@ def list_zones(db: Session = Depends(get_db)):
 @app.get("/api/sujetos")
 def list_subjects(db: Session = Depends(get_db)):
     return [
-        {"subject_id": s.subject_id, "name": s.name, "subject_type": s.subject_type,
-         "description": s.description}
+        {
+            "subject_id": s.subject_id,
+            "name": s.name,
+            "subject_type": s.subject_type,
+            "description": s.description,
+        }
         for s in db.scalars(select(Subject).order_by(Subject.subject_id))
     ]

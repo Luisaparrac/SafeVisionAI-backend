@@ -4,6 +4,7 @@ Order: higher severity first; on ties, the oldest event first; then lower id.
 A position index (id -> slot in the array) allows removing any alert in O(log n)
 when it gets reviewed, not only the top one.
 """
+
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -11,7 +12,7 @@ from datetime import datetime
 @dataclass
 class AlertEntry:
     event_id: int
-    severity: int          # 3 Alto, 2 Medio, 1 Bajo
+    severity: int  # 3 Alto, 2 Medio, 1 Bajo
     created_at: datetime
 
     def outranks(self, other: "AlertEntry") -> bool:
