@@ -1,10 +1,11 @@
-"""Builds ``EventView`` from domain events, translating values to UI labels."""
+"""Builds the output views from domain entities, translating values to UI labels."""
 
 from datetime import tzinfo
 
-from safevision.application.dto import EventView
+from safevision.application.dto import AlertView, EventView
 from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.domain.errors import NotFoundError
+from safevision.domain.model.alert import Alert
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
@@ -78,6 +79,19 @@ class EventPresenter:
     def present_many(self, uow: UnitOfWork, events: list[Event]) -> list[EventView]:
         references = _References(uow)
         return [self._view(event, references) for event in events]
+
+    def present_alert(self, uow: UnitOfWork, alert: Alert) -> AlertView:
+        event = uow.events.get(alert.event_id)
+        if event is None:
+            raise NotFoundError("Evento", alert.event_id)
+        if alert.id is None:
+            raise ValueError("only stored alerts can be presented")
+        return AlertView(
+            alert_id=alert.id,
+            level=alert.level.priority.value,
+            status=alert.status.label,
+            event=self.present(uow, event),
+        )
 
     def _view(self, event: Event, references: _References) -> EventView:
         if event.id is None:
