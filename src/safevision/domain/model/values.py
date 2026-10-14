@@ -4,6 +4,7 @@ Stored values (English) match the database; Spanish labels are what the
 frontend displays.
 """
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -218,3 +219,21 @@ class SubjectType(_ParsableEnum):
     CHILD = "child"
     ELDERLY = "elderly"
     PET = "pet"
+
+
+def _is_real_number(value: object) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value)
+
+
+@dataclass(frozen=True)
+class Confidence:
+    """Detection confidence reported by the vision model, between 0 and 1."""
+
+    value: float
+
+    def __post_init__(self) -> None:
+        if not _is_real_number(self.value):
+            raise ValidationError(f"La confianza debe ser un número, no {self.value!r}")
+        if not 0 <= self.value <= 1:
+            raise ValidationError(f"La confianza debe estar entre 0 y 1, no {self.value}")
+        object.__setattr__(self, "value", float(self.value))
