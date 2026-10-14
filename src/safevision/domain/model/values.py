@@ -196,3 +196,16 @@ _CLASS_LABELS = {
     DetectedClass.CAT: "Gato",
     DetectedClass.OTHER_ANIMAL: "Animal",
 }
+
+
+class CameraStatus(_ParsableEnum):
+    """Operational status reported for a camera."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DISCONNECTED = "disconnected"
+    MAINTENANCE = "maintenance"
+
+    @property
+    def is_operational(self) -> bool:
+        return self is CameraStatus.ACTIVE
