@@ -1,5 +1,7 @@
 """Small validation helpers shared by the entities."""
 
+from datetime import datetime
+
 from safevision.domain.errors import ValidationError
 
 
@@ -28,3 +30,10 @@ def required_id(value: object, field: str) -> int:
 
 def optional_id(value: object, field: str) -> int | None:
     return None if value is None else required_id(value, field)
+
+
+def aware_datetime(value: object, field: str) -> datetime:
+    """Instants must carry a time zone so they compare correctly with the database."""
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        raise ValidationError(f"El campo '{field}' debe ser una fecha con zona horaria")
+    return value
