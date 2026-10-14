@@ -9,8 +9,10 @@ import copy
 from safevision.application.ports.repositories import EventFilter
 from safevision.domain.errors import NotFoundError
 from safevision.domain.model.alert import Alert
+from safevision.domain.model.camera import Camera
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
+from safevision.domain.model.zone import Zone
 
 
 class InMemoryStore[T]:
@@ -87,3 +89,26 @@ class InMemoryEventTypeRepository(InMemoryStore[EventType]):
 
     def list_all(self) -> list[EventType]:
         return sorted(self.all(), key=lambda t: (-t.severity.level, t.name))
+
+
+class InMemoryCameraRepository(InMemoryStore[Camera]):
+    def __init__(self) -> None:
+        super().__init__("Cámara")
+        self.zones: InMemoryStore[Zone] = InMemoryStore("Zona")
+
+    def list_all(self) -> list[Camera]:
+        return self.all()
+
+    def get_zone(self, zone_id: int) -> Zone | None:
+        return self.zones.get(zone_id)
+
+    def list_zones(self) -> list[Zone]:
+        return self.zones.all()
+
+    def snapshot(self):
+        return super().snapshot(), self.zones.snapshot()
+
+    def restore(self, state) -> None:
+        cameras, zones = state
+        super().restore(cameras)
+        self.zones.restore(zones)

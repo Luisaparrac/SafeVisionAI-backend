@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from safevision.domain.model.alert import Alert
+from safevision.domain.model.camera import Camera
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.values import EventStatus
+from safevision.domain.model.zone import Zone
 
 
 @dataclass(frozen=True)
@@ -75,4 +77,25 @@ class EventTypeRepository(Protocol):
 
     def list_all(self) -> list[EventType]:
         """All types, most severe first, then by name."""
+        ...
+
+
+@runtime_checkable
+class CameraRepository(Protocol):
+    """Cameras and the zones defined on them."""
+
+    def get(self, camera_id: int) -> Camera | None: ...
+
+    def list_all(self) -> list[Camera]:
+        """All cameras ordered by id."""
+        ...
+
+    def update(self, camera: Camera) -> None:
+        """Saves the changes of an existing camera (raises NotFoundError if missing)."""
+        ...
+
+    def get_zone(self, zone_id: int) -> Zone | None: ...
+
+    def list_zones(self) -> list[Zone]:
+        """All zones ordered by id."""
         ...
