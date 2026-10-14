@@ -7,7 +7,18 @@ frontend displays.
 from dataclasses import dataclass
 from enum import StrEnum
 
-from safevision.domain.errors import ValidationError
+from safevision.domain.errors import InvalidTransitionError, ValidationError
+
+
+class _ParsableEnum(StrEnum):
+    """String enum whose ``parse`` raises a domain error instead of ``ValueError``."""
+
+    @classmethod
+    def parse(cls, value: str):
+        try:
+            return cls(value)
+        except ValueError:
+            raise ValidationError(f"Valor inválido para {cls.__name__}: {value!r}") from None
 
 
 class Priority(StrEnum):
@@ -60,3 +71,62 @@ class Severity:
         if self.level >= 3:
             return Priority.HIGH
         return Priority.MEDIUM if self.level == 2 else Priority.LOW
+
+
+class ReviewLabel(StrEnum):
+    """How the frontend groups event statuses."""
+
+    PENDING = "Pendiente"
+    REVIEWED = "Revisado"
+
+    @classmethod
+    def parse(cls, label: str) -> "ReviewLabel":
+        try:
+            return cls(label)
+        except ValueError:
+            raise ValidationError(f"Estado inválido: {label!r}") from None
+
+    @property
+    def statuses(self) -> tuple["EventStatus", ...]:
+        """Event statuses displayed under this label."""
+        return tuple(status for status in EventStatus if status.label is self)
+
+
+class EventStatus(_ParsableEnum):
+    """Life cycle of an event.
+
+    pending -> in_review -> resolved | false_alarm
+    pending -> resolved | false_alarm
+    resolved and false_alarm are terminal.
+    """
+
+    PENDING = "pending"
+    IN_REVIEW = "in_review"
+    RESOLVED = "resolved"
+    FALSE_ALARM = "false_alarm"
+
+    @property
+    def is_open(self) -> bool:
+        return self in (EventStatus.PENDING, EventStatus.IN_REVIEW)
+
+    @property
+    def label(self) -> ReviewLabel:
+        return ReviewLabel.PENDING if self.is_open else ReviewLabel.REVIEWED
+
+    def can_transition_to(self, target: "EventStatus") -> bool:
+        return target in _EVENT_TRANSITIONS[self]
+
+    def transition_to(self, target: "EventStatus") -> "EventStatus":
+        if not self.can_transition_to(target):
+            raise InvalidTransitionError("Evento", self.value, target.value)
+        return target
+
+
+_EVENT_TRANSITIONS = {
+    EventStatus.PENDING: frozenset(
+        {EventStatus.IN_REVIEW, EventStatus.RESOLVED, EventStatus.FALSE_ALARM}
+    ),
+    EventStatus.IN_REVIEW: frozenset({EventStatus.RESOLVED, EventStatus.FALSE_ALARM}),
+    EventStatus.RESOLVED: frozenset(),
+    EventStatus.FALSE_ALARM: frozenset(),
+}
