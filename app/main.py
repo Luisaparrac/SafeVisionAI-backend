@@ -65,7 +65,12 @@ def get_event(event_id: int, db: Session = Depends(get_db)):
     return services.to_view(services.get_event(db, event_id))
 
 
-@app.post("/api/eventos", response_model=EventView, status_code=201, dependencies=[Depends(require_iot_key)])
+@app.post(
+    "/api/eventos",
+    response_model=EventView,
+    status_code=201,
+    dependencies=[Depends(require_iot_key)],
+)
 def create_event(data: EventCreate, db: Session = Depends(get_db)):
     return services.create_event(db, data)
 
@@ -91,8 +96,13 @@ def metrics(db: Session = Depends(get_db)):
 def list_event_types(db: Session = Depends(get_db)):
     rows = db.scalars(select(EventType).order_by(EventType.severity_level.desc(), EventType.name))
     return [
-        {"event_type_id": t.event_type_id, "name": t.name, "description": t.description,
-         "severity_level": t.severity_level, "priority": services.priority_label(t.severity_level)}
+        {
+            "event_type_id": t.event_type_id,
+            "name": t.name,
+            "description": t.description,
+            "severity_level": t.severity_level,
+            "priority": services.priority_label(t.severity_level),
+        }
         for t in rows
     ]
 
@@ -108,8 +118,13 @@ def list_locations(db: Session = Depends(get_db)):
 @app.get("/api/camaras")
 def list_cameras(db: Session = Depends(get_db)):
     return [
-        {"camera_id": c.camera_id, "name": c.name, "ip_address": str(c.ip_address),
-         "status": c.status, "location_id": c.location_id}
+        {
+            "camera_id": c.camera_id,
+            "name": c.name,
+            "ip_address": str(c.ip_address),
+            "status": c.status,
+            "location_id": c.location_id,
+        }
         for c in db.scalars(select(Camera).order_by(Camera.camera_id))
     ]
 
@@ -127,8 +142,14 @@ def update_camera_status(camera_id: int, data: CameraStatus, db: Session = Depen
 @app.get("/api/zonas")
 def list_zones(db: Session = Depends(get_db)):
     return [
-        {"zone_id": z.zone_id, "name": z.name, "description": z.description,
-         "coordinates": z.coordinates, "is_active": z.is_active, "camera_id": z.camera_id}
+        {
+            "zone_id": z.zone_id,
+            "name": z.name,
+            "description": z.description,
+            "coordinates": z.coordinates,
+            "is_active": z.is_active,
+            "camera_id": z.camera_id,
+        }
         for z in db.scalars(select(Zone).order_by(Zone.zone_id))
     ]
 
@@ -136,7 +157,11 @@ def list_zones(db: Session = Depends(get_db)):
 @app.get("/api/sujetos")
 def list_subjects(db: Session = Depends(get_db)):
     return [
-        {"subject_id": s.subject_id, "name": s.name, "subject_type": s.subject_type,
-         "description": s.description}
+        {
+            "subject_id": s.subject_id,
+            "name": s.name,
+            "subject_type": s.subject_type,
+            "description": s.description,
+        }
         for s in db.scalars(select(Subject).order_by(Subject.subject_id))
     ]

@@ -11,9 +11,9 @@ def normalize_url(url: str) -> str:
             "DATABASE_URL is not set. Copy .env.example to .env and fill in the Azure connection."
         )
     if url.startswith("postgres://"):
-        url = "postgresql://" + url[len("postgres://"):]
+        url = "postgresql://" + url[len("postgres://") :]
     if url.startswith("postgresql://"):
-        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
     return url
 
 

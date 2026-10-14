@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class EventView(BaseModel):
     """Exactly the shape the frontend's RiskEvent uses (UI values in Spanish)."""
+
     id: int
     type: str
     subject: str
@@ -12,8 +13,8 @@ class EventView(BaseModel):
     camera: str
     date: str
     time: str
-    priority: str   # Alto / Medio / Bajo
-    status: str     # Pendiente / Revisado
+    priority: str  # Alto / Medio / Bajo
+    status: str  # Pendiente / Revisado
     description: str | None = None
 
 
@@ -26,9 +27,12 @@ class AlertView(BaseModel):
 
 class EventCreate(BaseModel):
     """What the IoT module sends when it detects something."""
+
     camera_id: int
     event_type_id: int | None = None
-    event_type: str | None = Field(None, description="Event type name, alternative to event_type_id")
+    event_type: str | None = Field(
+        None, description="Event type name, alternative to event_type_id"
+    )
     subject_id: int | None = None
     zone_id: int | None = None
     detected_class: Literal["person", "dog", "cat", "other_animal"] = "person"

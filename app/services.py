@@ -1,4 +1,5 @@
 """System logic: keeps the Azure database and the in-memory structures in sync."""
+
 from datetime import datetime
 from threading import Lock
 from zoneinfo import ZoneInfo
@@ -20,7 +21,12 @@ OPEN_EVENT_STATUSES = ("pending", "in_review")
 CLOSED_EVENT_STATUSES = ("resolved", "false_alarm")
 OPEN_ALERT_STATUSES = ("active", "seen")
 SEVERITIES_BY_PRIORITY = {"Alto": (3, 4), "Medio": (2,), "Bajo": (1,)}
-ALERT_STATUS_LABELS = {"active": "Activa", "seen": "Vista", "resolved": "Atendida", "dismissed": "Descartada"}
+ALERT_STATUS_LABELS = {
+    "active": "Activa",
+    "seen": "Vista",
+    "resolved": "Atendida",
+    "dismissed": "Descartada",
+}
 CLASS_LABELS = {"person": "Persona", "dog": "Perro", "cat": "Gato", "other_animal": "Animal"}
 
 alert_queue = AlertPriorityQueue()
@@ -87,7 +93,9 @@ def rebuild_structures(db: Session) -> None:
     for event in db.scalars(_event_query().where(Event.status.in_(OPEN_EVENT_STATUSES))).unique():
         queue.push(_entry(event))
     rows = db.scalars(
-        _event_query().order_by(Event.occurred_at.desc(), Event.event_id.desc()).limit(config.HISTORY_CAPACITY)
+        _event_query()
+        .order_by(Event.occurred_at.desc(), Event.event_id.desc())
+        .limit(config.HISTORY_CAPACITY)
     ).unique()
     for event in rows:
         recent.add_oldest(event.event_id, to_view(event).model_dump())
@@ -102,19 +110,24 @@ def get_event(db: Session, event_id: int) -> Event:
     return event
 
 
-def list_events(db: Session, q: str | None, prioridad: str | None, estado: str | None) -> list[EventView]:
+def list_events(
+    db: Session, q: str | None, prioridad: str | None, estado: str | None
+) -> list[EventView]:
     stmt = _event_query().order_by(Event.occurred_at.desc(), Event.event_id.desc())
     if estado == "Pendiente":
         stmt = stmt.where(Event.status.in_(OPEN_EVENT_STATUSES))
     elif estado == "Revisado":
         stmt = stmt.where(Event.status.in_(CLOSED_EVENT_STATUSES))
     if prioridad in SEVERITIES_BY_PRIORITY:
-        stmt = stmt.join(Event.event_type).where(EventType.severity_level.in_(SEVERITIES_BY_PRIORITY[prioridad]))
+        stmt = stmt.join(Event.event_type).where(
+            EventType.severity_level.in_(SEVERITIES_BY_PRIORITY[prioridad])
+        )
     views = [to_view(e) for e in db.scalars(stmt).unique()]
     if q:
         term = q.lower().strip()
         views = [
-            v for v in views
+            v
+            for v in views
             if any(term in str(value).lower() for value in (v.id, v.type, v.subject, v.location))
         ]
     return views
@@ -128,11 +141,15 @@ def create_event(db: Session, data: EventCreate) -> EventView:
     if data.zone_id is not None:
         zone = db.get(Zone, data.zone_id)
         if zone is None or zone.camera_id != data.camera_id:
-            raise HTTPException(404, f"Zona {data.zone_id} no existe para la cámara {data.camera_id}")
+            raise HTTPException(
+                404, f"Zona {data.zone_id} no existe para la cámara {data.camera_id}"
+            )
     if data.event_type_id is not None:
         event_type = db.get(EventType, data.event_type_id)
     elif data.event_type:
-        event_type = db.scalar(select(EventType).where(func.lower(EventType.name) == data.event_type.lower()))
+        event_type = db.scalar(
+            select(EventType).where(func.lower(EventType.name) == data.event_type.lower())
+        )
     else:
         raise HTTPException(422, "Envía event_type_id o event_type")
     if event_type is None:
@@ -188,12 +205,16 @@ def pending_alerts(db: Session, limit: int) -> list[dict]:
         alert = db.scalar(
             select(Alert).where(Alert.event_id == entry.event_id).order_by(Alert.alert_id.desc())
         )
-        result.append({
-            "id_alerta": alert.alert_id if alert else 0,
-            "nivel": priority_label(alert.level if alert else entry.severity),
-            "estado": ALERT_STATUS_LABELS.get(alert.status, alert.status) if alert else "Activa",
-            "event": to_view(event),
-        })
+        result.append(
+            {
+                "id_alerta": alert.alert_id if alert else 0,
+                "nivel": priority_label(alert.level if alert else entry.severity),
+                "estado": ALERT_STATUS_LABELS.get(alert.status, alert.status)
+                if alert
+                else "Activa",
+                "event": to_view(event),
+            }
+        )
     return result
 
 
@@ -204,9 +225,14 @@ def recent_events(limit: int) -> list[dict]:
 
 def metrics(db: Session) -> dict:
     total = db.scalar(select(func.count(Event.event_id))) or 0
-    alto = db.scalar(
-        select(func.count(Event.event_id)).join(Event.event_type).where(EventType.severity_level >= 3)
-    ) or 0
+    alto = (
+        db.scalar(
+            select(func.count(Event.event_id))
+            .join(Event.event_type)
+            .where(EventType.severity_level >= 3)
+        )
+        or 0
+    )
     with _lock:
         pendientes = len(alert_queue)
     return {"total": total, "pendientes": pendientes, "alto": alto}

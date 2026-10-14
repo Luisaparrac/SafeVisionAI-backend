@@ -3,6 +3,7 @@
 Adding goes at the head in O(1); when capacity is exceeded the tail is dropped
 in O(1). A dict index gives O(1) access to a node to update its status.
 """
+
 from dataclasses import dataclass
 from typing import Any, Iterator
 

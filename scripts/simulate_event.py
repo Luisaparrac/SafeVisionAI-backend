@@ -7,6 +7,7 @@ Usage:
 Without --camara/--tipo it picks the first camera and a random event type from the API.
 Only uses the standard library.
 """
+
 import argparse
 import json
 import random
