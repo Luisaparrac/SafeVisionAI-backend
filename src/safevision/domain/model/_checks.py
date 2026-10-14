@@ -17,3 +17,14 @@ def optional_text(value: object, field: str) -> str | None:
     if not isinstance(value, str):
         raise ValidationError(f"El campo '{field}' debe ser texto")
     return value.strip() or None
+
+
+def required_id(value: object, field: str) -> int:
+    """Identifiers of related entities are positive integers."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValidationError(f"El campo '{field}' debe ser un identificador válido")
+    return value
+
+
+def optional_id(value: object, field: str) -> int | None:
+    return None if value is None else required_id(value, field)
