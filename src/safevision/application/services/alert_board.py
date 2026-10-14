@@ -19,6 +19,10 @@ class AlertBoard:
         self._history: EventHistory[EventView] = EventHistory(history_capacity)
         self._lock = Lock()
 
+    @property
+    def history_capacity(self) -> int:
+        return self._history_capacity
+
     def add(self, entry: AlertEntry, view: EventView) -> None:
         """A new event with an open alert. O(log n)."""
         with self._lock:
