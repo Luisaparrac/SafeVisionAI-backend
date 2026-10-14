@@ -9,6 +9,7 @@ from typing import Protocol, runtime_checkable
 
 from safevision.domain.model.alert import Alert
 from safevision.domain.model.event import Event
+from safevision.domain.model.event_type import EventType
 from safevision.domain.model.values import EventStatus
 
 
@@ -59,4 +60,19 @@ class AlertRepository(Protocol):
 
     def find_by_event(self, event_id: int) -> list[Alert]:
         """Alerts raised for an event, oldest first (by id)."""
+        ...
+
+
+@runtime_checkable
+class EventTypeRepository(Protocol):
+    """Read-only catalog of event types."""
+
+    def get(self, event_type_id: int) -> EventType | None: ...
+
+    def find_by_name(self, name: str) -> EventType | None:
+        """Case-insensitive lookup, as the IoT module sends names."""
+        ...
+
+    def list_all(self) -> list[EventType]:
+        """All types, most severe first, then by name."""
         ...

@@ -10,6 +10,7 @@ from safevision.application.ports.repositories import EventFilter
 from safevision.domain.errors import NotFoundError
 from safevision.domain.model.alert import Alert
 from safevision.domain.model.event import Event
+from safevision.domain.model.event_type import EventType
 
 
 class InMemoryStore[T]:
@@ -75,3 +76,14 @@ class InMemoryAlertRepository(InMemoryStore[Alert]):
 
     def find_by_event(self, event_id: int) -> list[Alert]:
         return [alert for alert in self.all() if alert.event_id == event_id]
+
+
+class InMemoryEventTypeRepository(InMemoryStore[EventType]):
+    def __init__(self) -> None:
+        super().__init__("Tipo de evento")
+
+    def find_by_name(self, name: str) -> EventType | None:
+        return next((t for t in self.all() if t.has_name(name)), None)
+
+    def list_all(self) -> list[EventType]:
+        return sorted(self.all(), key=lambda t: (-t.severity.level, t.name))
