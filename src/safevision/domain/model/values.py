@@ -237,3 +237,42 @@ class Confidence:
         if not 0 <= self.value <= 1:
             raise ValidationError(f"La confianza debe estar entre 0 y 1, no {self.value}")
         object.__setattr__(self, "value", float(self.value))
+
+
+Point = tuple[float, float]
+
+
+@dataclass(frozen=True)
+class ZonePolygon:
+    """Polygon of a monitored zone: at least three ``[x, y]`` points."""
+
+    points: tuple[Point, ...]
+
+    MIN_POINTS = 3
+
+    def __post_init__(self) -> None:
+        if isinstance(self.points, str | bytes) or not hasattr(self.points, "__iter__"):
+            raise ValidationError("Las coordenadas de la zona deben ser una lista de puntos")
+        points = tuple(self._point(raw) for raw in self.points)
+        if len(points) < self.MIN_POINTS:
+            raise ValidationError(
+                f"La zona necesita al menos {self.MIN_POINTS} puntos, tiene {len(points)}"
+            )
+        object.__setattr__(self, "points", points)
+
+    @staticmethod
+    def _point(raw: object) -> Point:
+        if isinstance(raw, str | bytes) or not hasattr(raw, "__len__") or len(raw) != 2:
+            raise ValidationError(f"Cada punto debe ser [x, y], no {raw!r}")
+        x, y = raw
+        if not (_is_real_number(x) and _is_real_number(y)):
+            raise ValidationError(f"Las coordenadas deben ser números, no {raw!r}")
+        return (float(x), float(y))
+
+    @classmethod
+    def from_list(cls, coordinates: list) -> "ZonePolygon":
+        return cls(tuple(coordinates) if isinstance(coordinates, list) else coordinates)
+
+    def to_list(self) -> list[list[float]]:
+        """The JSON shape stored in the database."""
+        return [[x, y] for x, y in self.points]
