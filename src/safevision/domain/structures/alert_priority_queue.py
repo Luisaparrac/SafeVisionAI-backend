@@ -17,10 +17,15 @@ peek               O(1)
 pop                O(log n)
 remove(event_id)   O(log n)
 contains / len     O(1)
-top(k)             O(k log n)
+top(k)             O(k log k)
 =================  ==========
 
 Space: O(n) for the array plus O(n) for the position index.
+
+``top(k)`` does not copy the heap. It walks it best-first with a small
+auxiliary max-heap of candidate slots: the next most urgent alert is always
+the root or a child of an alert already taken, so at most ``2k`` candidates
+are ever considered.
 """
 
 from dataclasses import dataclass
@@ -84,14 +89,48 @@ class AlertPriorityQueue:
         return True
 
     def top(self, k: int) -> list[AlertEntry]:
-        """The k most urgent alerts in order, leaving the queue untouched. O(k log n)."""
-        copy = AlertPriorityQueue()
-        copy._heap = list(self._heap)
-        copy._position = dict(self._position)
+        """The k most urgent alerts in order, leaving the queue untouched. O(k log k)."""
         result: list[AlertEntry] = []
-        while len(result) < k and copy._heap:
-            result.append(copy._remove_at(0))
+        candidates: list[int] = [0] if self._heap else []
+        while candidates and len(result) < k:
+            index = self._pop_candidate(candidates)
+            result.append(self._heap[index])
+            for child in (2 * index + 1, 2 * index + 2):
+                if child < len(self._heap):
+                    self._push_candidate(candidates, child)
         return result
+
+    def _ranks_before(self, i: int, j: int) -> bool:
+        return self._heap[i].outranks(self._heap[j])
+
+    def _push_candidate(self, candidates: list[int], index: int) -> None:
+        candidates.append(index)
+        child = len(candidates) - 1
+        while child > 0:
+            parent = (child - 1) // 2
+            if not self._ranks_before(candidates[child], candidates[parent]):
+                return
+            candidates[child], candidates[parent] = candidates[parent], candidates[child]
+            child = parent
+
+    def _pop_candidate(self, candidates: list[int]) -> int:
+        best = candidates[0]
+        last = candidates.pop()
+        if candidates:
+            candidates[0] = last
+            parent = 0
+            while True:
+                chosen = parent
+                for child in (2 * parent + 1, 2 * parent + 2):
+                    if child < len(candidates) and self._ranks_before(
+                        candidates[child], candidates[chosen]
+                    ):
+                        chosen = child
+                if chosen == parent:
+                    break
+                candidates[parent], candidates[chosen] = candidates[chosen], candidates[parent]
+                parent = chosen
+        return best
 
     def _remove_at(self, index: int) -> AlertEntry:
         removed = self._heap[index]

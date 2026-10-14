@@ -90,3 +90,19 @@ def test_reinsert_after_removal():
     queue.remove(1)
     assert queue.push(entry(1, 4))
     assert queue.peek().severity == Severity(4)
+
+
+def test_top_matches_full_sorted_order_for_every_k():
+    queue = AlertPriorityQueue()
+    for i in range(40):
+        queue.push(entry(i, i * 7 % 4 + 1, minutes=i * 13 % 9))
+    full = ids(queue.top(len(queue)))
+    expected = ids(
+        sorted(
+            (entry(i, i * 7 % 4 + 1, minutes=i * 13 % 9) for i in range(40)),
+            key=lambda e: (-e.severity.level, e.created_at, e.event_id),
+        )
+    )
+    assert full == expected
+    for k in range(len(queue) + 1):
+        assert ids(queue.top(k)) == expected[:k]
