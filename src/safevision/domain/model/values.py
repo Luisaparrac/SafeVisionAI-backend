@@ -130,3 +130,48 @@ _EVENT_TRANSITIONS = {
     EventStatus.RESOLVED: frozenset(),
     EventStatus.FALSE_ALARM: frozenset(),
 }
+
+
+class AlertStatus(_ParsableEnum):
+    """Life cycle of an alert.
+
+    active -> seen -> resolved | dismissed
+    active -> resolved | dismissed
+    resolved and dismissed are terminal and require an attention time.
+    """
+
+    ACTIVE = "active"
+    SEEN = "seen"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
+
+    @property
+    def is_open(self) -> bool:
+        return self in (AlertStatus.ACTIVE, AlertStatus.SEEN)
+
+    @property
+    def label(self) -> str:
+        return _ALERT_LABELS[self]
+
+    def can_transition_to(self, target: "AlertStatus") -> bool:
+        return target in _ALERT_TRANSITIONS[self]
+
+    def transition_to(self, target: "AlertStatus") -> "AlertStatus":
+        if not self.can_transition_to(target):
+            raise InvalidTransitionError("Alerta", self.value, target.value)
+        return target
+
+
+_ALERT_LABELS = {
+    AlertStatus.ACTIVE: "Activa",
+    AlertStatus.SEEN: "Vista",
+    AlertStatus.RESOLVED: "Atendida",
+    AlertStatus.DISMISSED: "Descartada",
+}
+
+_ALERT_TRANSITIONS = {
+    AlertStatus.ACTIVE: frozenset({AlertStatus.SEEN, AlertStatus.RESOLVED, AlertStatus.DISMISSED}),
+    AlertStatus.SEEN: frozenset({AlertStatus.RESOLVED, AlertStatus.DISMISSED}),
+    AlertStatus.RESOLVED: frozenset(),
+    AlertStatus.DISMISSED: frozenset(),
+}
