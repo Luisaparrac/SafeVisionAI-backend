@@ -209,3 +209,12 @@ class CameraStatus(_ParsableEnum):
     @property
     def is_operational(self) -> bool:
         return self is CameraStatus.ACTIVE
+
+
+class SubjectType(_ParsableEnum):
+    """Kind of monitored subject."""
+
+    PERSON = "person"
+    CHILD = "child"
+    ELDERLY = "elderly"
+    PET = "pet"
