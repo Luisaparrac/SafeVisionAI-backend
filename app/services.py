@@ -1,4 +1,4 @@
-"""System logic: keeps the Azure database and the in-memory structures in sync."""
+"""System logic: keeps the database and the in-memory structures in sync."""
 
 from datetime import datetime
 from threading import Lock

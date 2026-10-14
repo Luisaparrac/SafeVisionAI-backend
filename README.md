@@ -1,7 +1,7 @@
 # SafeVision AI — Backend
 
 REST API in Python (FastAPI) for SafeVision AI. Reads and writes events and alerts in the
-team's Azure PostgreSQL database, receives detections from the IoT module, and serves the
+team's PostgreSQL database, receives detections from the IoT module, and serves the
 data to the frontend.
 
 ## Data structures
@@ -16,11 +16,10 @@ kept in sync on every create/review.
 
 ## Database
 
-The backend connects to the team's **Azure PostgreSQL** database (`safevisionai`), whose
-8 tables (`users`, `locations`, `cameras`, `zones`, `subjects`, `event_types`, `events`,
-`alerts`) are created by `01_tables.sql` and owned by `safevision_admin`. The backend
-**never creates or alters tables** and inserts no seed data: it connects as
-`app_safevision`, which only has SELECT/INSERT/UPDATE/DELETE.
+The backend connects to the team's PostgreSQL database, whose 8 tables (`users`,
+`locations`, `cameras`, `zones`, `subjects`, `event_types`, `events`, `alerts`) are owned
+by another role. The backend **never creates or alters tables** and inserts no seed data:
+its database user only has SELECT/INSERT/UPDATE/DELETE.
 
 Database values are in English; the API translates them to the Spanish labels the
 frontend uses:
@@ -36,14 +35,14 @@ Reviewing an event sets `events.status = 'resolved'` and closes its open alerts
 
 ## Run locally
 
-Your public IP must be allowed in the Azure firewall first.
+Your public IP must be allowed in the database firewall first.
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 copy .env.example .env             # macOS/Linux: cp .env.example .env
-# edit .env with the real password (URL-encoded: ! -> %21)
+# edit .env with your connection data (password URL-encoded: ! -> %21)
 uvicorn app.main:app --reload
 ```
 
@@ -100,7 +99,7 @@ Camera status: `PATCH /api/camaras/{id}/estado` with `{"status": "active"}`
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | Azure PostgreSQL URL with `?sslmode=require`. Required. |
+| `DATABASE_URL` | PostgreSQL URL with `?sslmode=require`. Required. |
 | `IOT_API_KEY` | Key required to create events. Empty = no check (local only). |
 | `FRONTEND_ORIGINS` | Allowed CORS origins, comma separated. |
 | `TIMEZONE` | Default `America/Bogota`. |
@@ -108,8 +107,8 @@ Camera status: `PATCH /api/camaras/{id}/estado` with `{"status": "active"}`
 ## Deploy on Render
 
 1. Push to GitHub; Render redeploys automatically.
-2. In the service's environment variables, set `DATABASE_URL` to the Azure URL.
-3. Add the service's outbound IPs (Connect → Outbound) as firewall rules in Azure.
+2. In the service's environment variables, set `DATABASE_URL` to the database URL.
+3. Add the service's outbound IPs (Connect → Outbound) as database firewall rules.
 
 Free plan note: the service sleeps after 15 minutes without traffic and takes about a
 minute to wake up.

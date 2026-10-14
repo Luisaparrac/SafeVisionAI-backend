@@ -13,7 +13,7 @@ from app.schemas import AlertView, CameraStatus, EventCreate, EventView, Metrics
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Tables already exist in Azure: no create_all, no seed. Only load the structures.
+    # Tables already exist in the database: no create_all, no seed. Only load the structures.
     with SessionLocal() as db:
         services.rebuild_structures(db)
     yield

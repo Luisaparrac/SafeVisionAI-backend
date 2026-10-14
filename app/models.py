@@ -1,6 +1,6 @@
-"""Mapping of the team's Azure PostgreSQL schema (01_tables.sql).
+"""Mapping of the team's PostgreSQL schema.
 
-The tables already exist and are owned by safevision_admin. This backend never
+The tables already exist and are owned by another role. This backend never
 creates or alters them; it only reads and writes rows.
 """
 

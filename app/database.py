@@ -8,7 +8,7 @@ def normalize_url(url: str) -> str:
     """Accepts 'postgres://' or 'postgresql://' and selects the psycopg 3 driver."""
     if not url:
         raise RuntimeError(
-            "DATABASE_URL is not set. Copy .env.example to .env and fill in the Azure connection."
+            "DATABASE_URL is not set. Copy .env.example to .env and fill in the connection."
         )
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
