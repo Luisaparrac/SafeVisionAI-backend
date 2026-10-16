@@ -88,3 +88,10 @@ def test_detection_after_the_window_is_a_new_event(client, clock, settings):
 def test_browsers_can_read_the_duplicate_header(client):
     response = client.get("/health", headers={"Origin": "http://localhost:5173"})
     assert "X-Duplicate" in response.headers["access-control-expose-headers"]
+
+
+def test_oversized_description_is_rejected_before_storing(client, uow):
+    body = {"camera_id": 1, "event_type_id": 1, "description": "x" * 2001}
+    response = client.post("/api/eventos", json=body, headers=KEY)
+    assert response.status_code == 422
+    assert uow.events.all() == []
