@@ -109,3 +109,16 @@ def test_filter_by_dates_uses_local_days_inclusive(by_date):
 def test_reversed_dates_are_rejected(by_date):
     with pytest.raises(ValidationError):
         by_date.execute(date_from=date(2026, 10, 15), date_to=date(2026, 10, 14))
+
+
+def test_pagination(list_events):
+    assert ids(list_events.execute(limit=2)) == [5, 4]
+    assert ids(list_events.execute(limit=2, offset=2)) == [3, 2]
+    assert ids(list_events.execute(offset=4)) == [1]
+    assert ids(list_events.execute(status="Revisado", limit=1, offset=1)) == [2]
+
+
+def test_pagination_applies_after_the_text_search(list_events):
+    # Only events 1 (Rosa) and 4 (Escalera) match; the page is cut from those.
+    assert ids(list_events.execute(q="a", limit=1)) == ids(list_events.execute(q="a"))[:1]
+    assert ids(list_events.execute(q="rosa", offset=1)) == []

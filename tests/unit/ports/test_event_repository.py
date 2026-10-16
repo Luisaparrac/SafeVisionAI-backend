@@ -75,3 +75,11 @@ def test_find_and_count_by_camera(repo):
     repo.add(new_event(camera_id=3))
     assert [e.id for e in repo.find(EventFilter(camera_ids=(1, 3)))] == [3, 1]
     assert repo.count(EventFilter(camera_ids=(2,))) == 1
+
+
+def test_find_pages_with_offset_and_limit(repo):
+    for minutes in range(5):
+        repo.add(new_event(minutes=minutes))
+    assert [e.id for e in repo.find(ALL, limit=2, offset=1)] == [4, 3]
+    assert [e.id for e in repo.find(ALL, offset=3)] == [2, 1]
+    assert repo.find(ALL, limit=2, offset=10) == []

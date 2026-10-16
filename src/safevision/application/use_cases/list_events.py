@@ -23,12 +23,15 @@ class ListEvents:
         camera_id: int | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[EventView]:
         """Newest first. Unknown priority or status labels are ignored, as in the panel.
 
         ``q`` matches, case-insensitively, the id, type, subject or location shown.
         ``camera_id`` keeps only the events of that camera. ``date_from`` and
         ``date_to`` are local dates in the configured time zone, both inclusive.
+        ``offset`` and ``limit`` page the filtered result; without them nothing is cut.
         """
         if date_from is not None and date_to is not None and date_from > date_to:
             raise ValidationError("La fecha 'desde' no puede ser posterior a 'hasta'")
@@ -40,18 +43,22 @@ class ListEvents:
                 occurred_from=self._start_of(date_from),
                 occurred_before=self._start_of(date_to + timedelta(days=1) if date_to else None),
             )
+            if not q:
+                # Paged by the repository: only the requested page is read and presented.
+                events = uow.events.find(criteria, limit=limit, offset=offset)
+                return self._presenter.present_many(uow, events)
             views = self._presenter.present_many(uow, uow.events.find(criteria))
-        if q:
-            term = q.lower().strip()
-            views = [
-                view
-                for view in views
-                if any(
-                    term in str(value).lower()
-                    for value in (view.id, view.type, view.subject, view.location)
-                )
-            ]
-        return views
+        # The text search runs on the presented values, so the page is cut afterwards.
+        term = q.lower().strip()
+        views = [
+            view
+            for view in views
+            if any(
+                term in str(value).lower()
+                for value in (view.id, view.type, view.subject, view.location)
+            )
+        ]
+        return views[offset:] if limit is None else views[offset : offset + limit]
 
     def _start_of(self, day: date | None) -> datetime | None:
         if day is None:

@@ -59,10 +59,10 @@ class InMemoryEventRepository(InMemoryStore[Event]):
     def __init__(self) -> None:
         super().__init__("Evento")
 
-    def find(self, criteria: EventFilter, limit: int | None = None) -> list[Event]:
+    def find(self, criteria: EventFilter, limit: int | None = None, offset: int = 0) -> list[Event]:
         rows = [event for event in self.all() if self._matches(event, criteria)]
         rows.sort(key=lambda e: (e.occurred_at, e.id), reverse=True)
-        return rows if limit is None else rows[:limit]
+        return rows[offset:] if limit is None else rows[offset : offset + limit]
 
     def count(self, criteria: EventFilter) -> int:
         return len(self.find(criteria))

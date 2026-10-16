@@ -122,3 +122,19 @@ def test_filter_by_dates(client, clock):
     )
     assert reversed_range.status_code == 422
     assert client.get("/api/eventos", params={"desde": "14/10/2026"}).status_code == 422
+
+
+def test_pagination_is_optional(client, clock):
+    created = []
+    for event_type_id in (1, 2, 3, 4):
+        created.append(post(client, camera_id=1, event_type_id=event_type_id))
+        clock.advance(1)
+    newest_first = [e["id"] for e in reversed(created)]
+    assert [e["id"] for e in client.get("/api/eventos").json()] == newest_first
+    page = client.get("/api/eventos", params={"limit": 2, "offset": 1}).json()
+    assert [e["id"] for e in page] == newest_first[1:3]
+
+
+@pytest.mark.parametrize("params", [{"limit": 0}, {"limit": 501}, {"offset": -1}])
+def test_pagination_bounds(client, params):
+    assert client.get("/api/eventos", params=params).status_code == 422

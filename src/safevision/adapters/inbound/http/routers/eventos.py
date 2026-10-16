@@ -13,6 +13,8 @@ router = APIRouter(prefix="/api/eventos", tags=["eventos"])
 
 # Sent when a repeated detection reused a recent event instead of creating one.
 DUPLICATE_HEADER = "X-Duplicate"
+# Optional pagination of /api/eventos; without limit the whole history is returned, as before.
+MAX_PAGE_SIZE = 500
 
 
 @router.get("", response_model=list[EventOut])
@@ -23,6 +25,8 @@ def list_events(
     camara_id: int | None = Query(None, description="Solo eventos de esta cámara"),
     desde: date | None = Query(None, description="Fecha local inicial (AAAA-MM-DD), inclusive"),
     hasta: date | None = Query(None, description="Fecha local final (AAAA-MM-DD), inclusive"),
+    limit: int | None = Query(None, ge=1, le=MAX_PAGE_SIZE, description="Tamaño de página"),
+    offset: int = Query(0, ge=0, description="Eventos que se saltan"),
     container: Container = Depends(get_container),
 ) -> list[EventOut]:
     """Newest first. ``q`` searches the id, type, subject and location."""
@@ -33,6 +37,8 @@ def list_events(
         camera_id=camara_id,
         date_from=desde,
         date_to=hasta,
+        limit=limit,
+        offset=offset,
     )
     return [EventOut.from_view(view) for view in views]
 

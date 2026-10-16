@@ -122,10 +122,12 @@ class SqlAlchemyEventRepository:
         mappers.apply_event(event, row)
         self._session.flush()
 
-    def find(self, criteria: EventFilter, limit: int | None = None) -> list[Event]:
+    def find(self, criteria: EventFilter, limit: int | None = None, offset: int = 0) -> list[Event]:
         statement = _filtered(select(EventRow), criteria).order_by(
             EventRow.occurred_at.desc(), EventRow.event_id.desc()
         )
+        if offset:
+            statement = statement.offset(offset)
         if limit is not None:
             statement = statement.limit(limit)
         return [mappers.event_to_domain(row) for row in self._session.scalars(statement)]

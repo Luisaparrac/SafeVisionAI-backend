@@ -43,8 +43,11 @@ class EventRepository(Protocol):
         """Saves the changes of an existing event (raises NotFoundError if missing)."""
         ...
 
-    def find(self, criteria: EventFilter, limit: int | None = None) -> list[Event]:
-        """Matching events, newest first (by occurrence time, then by id)."""
+    def find(self, criteria: EventFilter, limit: int | None = None, offset: int = 0) -> list[Event]:
+        """Matching events, newest first (by occurrence time, then by id).
+
+        ``offset`` skips that many events and ``limit`` caps the result (None: no cap).
+        """
         ...
 
     def count(self, criteria: EventFilter) -> int:
