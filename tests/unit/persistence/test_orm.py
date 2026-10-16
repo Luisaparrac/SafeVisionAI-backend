@@ -47,3 +47,12 @@ def test_primary_key_is_the_identity_column(table):
 
 def test_catalog_tables_are_mapped():
     assert {"users", "locations", "subjects", "event_types"} <= set(MAPPED)
+
+
+def test_camera_tables_are_mapped():
+    assert {"cameras", "zones"} <= set(MAPPED)
+
+
+def test_camera_ip_and_zone_coordinates_use_postgres_types():
+    assert orm.CameraRow.__table__.c.ip_address.type.__visit_name__ == "INET"
+    assert orm.ZoneRow.__table__.c.coordinates.type.__visit_name__ == "JSONB"

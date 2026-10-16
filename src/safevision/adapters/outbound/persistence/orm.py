@@ -7,7 +7,17 @@ role: this module never creates, alters or drops them.
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, FetchedValue, ForeignKey, SmallInteger, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    FetchedValue,
+    ForeignKey,
+    SmallInteger,
+    String,
+    Text,
+)
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -53,3 +63,24 @@ class EventTypeRow(Base):
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(Text)
     severity_level: Mapped[int] = mapped_column(SmallInteger)
+
+
+class CameraRow(Base):
+    __tablename__ = "cameras"
+
+    camera_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    ip_address: Mapped[str] = mapped_column(INET)
+    status: Mapped[str] = mapped_column(String, server_default=FetchedValue())
+    location_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("locations.location_id"))
+
+
+class ZoneRow(Base):
+    __tablename__ = "zones"
+
+    zone_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text)
+    coordinates: Mapped[list] = mapped_column(JSONB)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=FetchedValue())
+    camera_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cameras.camera_id"))
