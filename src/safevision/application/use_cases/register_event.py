@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 
-from safevision.application.dto import EventView
+from safevision.application.dto import NEW_ALERT, AlertNotification, AlertView, EventView
 from safevision.application.ports.clock import Clock
+from safevision.application.ports.notifier import AlertNotifier
 from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.application.presenter import EventPresenter
 from safevision.application.services.alert_board import AlertBoard
@@ -42,12 +43,14 @@ class RegisterEvent:
         board: AlertBoard,
         deduplicator: EventDeduplicator,
         presenter: EventPresenter,
+        notifier: AlertNotifier | None = None,
     ) -> None:
         self._uow = uow
         self._clock = clock
         self._board = board
         self._deduplicator = deduplicator
         self._presenter = presenter
+        self._notifier = notifier
 
     def execute(self, command: RegisterEventCommand) -> RegistrationResult:
         with self._uow as uow:
@@ -87,13 +90,21 @@ class RegisterEvent:
                     description=command.description,
                 )
             )
-            uow.alerts.add(Alert.for_event(event, event_type))
+            alert = uow.alerts.add(Alert.for_event(event, event_type))
             view = self._presenter.present(uow, event)
             uow.commit()
 
         # Memory is updated only after the commit succeeded.
         self._board.add(AlertEntry(event.id, event_type.severity, event.occurred_at), view)
         self._deduplicator.remember(key, event.id)
+        if self._notifier is not None:
+            alert_view = AlertView(
+                alert_id=alert.id,
+                level=alert.level.priority.value,
+                status=alert.status.label,
+                event=view,
+            )
+            self._notifier.publish(AlertNotification(NEW_ALERT, view, alert_view))
         return RegistrationResult(view, created=True)
 
     @staticmethod

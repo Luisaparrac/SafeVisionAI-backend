@@ -33,3 +33,20 @@ class Metrics:
     total: int
     pending: int
     high: int
+
+
+NEW_ALERT = "new_alert"
+EVENT_CLOSED = "event_closed"
+
+
+@dataclass(frozen=True)
+class AlertNotification:
+    """Something the panel should hear about right away.
+
+    ``new_alert``: an event was registered and raised ``alert``.
+    ``event_closed``: ``event`` was reviewed or marked as a false alarm.
+    """
+
+    kind: str
+    event: EventView
+    alert: AlertView | None = None

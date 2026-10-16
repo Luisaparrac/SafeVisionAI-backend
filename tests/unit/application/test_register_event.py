@@ -113,3 +113,34 @@ def test_failed_commit_leaves_memory_untouched(register, uow, board, monkeypatch
     monkeypatch.undo()
     # The failed attempt was not remembered, so the retry is registered.
     assert register.execute(RegisterEventCommand(camera_id=1, event_type_id=1)).created
+
+
+def test_new_alert_is_published_after_the_commit(uow, clock, board, presenter):
+    from safevision.application.dto import NEW_ALERT
+    from tests.fakes.notifier import RecordingNotifier
+
+    notifier = RecordingNotifier()
+    deduplicator = EventDeduplicator(timedelta(seconds=30), clock.now)
+    register = RegisterEvent(uow, clock, board, deduplicator, presenter, notifier)
+    result = register.execute(RegisterEventCommand(camera_id=1, event_type_id=1))
+    [notification] = notifier.published
+    assert notification.kind == NEW_ALERT
+    assert notification.event == result.view
+    assert (notification.alert.alert_id, notification.alert.level) == (1, "Alto")
+    assert notification.alert.status == "Activa"
+    assert uow.commits == 1
+
+    # A repeated detection raises no new alert, so nothing is published.
+    register.execute(RegisterEventCommand(camera_id=1, event_type_id=1))
+    assert len(notifier.published) == 1
+
+
+def test_failed_registration_publishes_nothing(uow, clock, board, presenter):
+    from tests.fakes.notifier import RecordingNotifier
+
+    notifier = RecordingNotifier()
+    deduplicator = EventDeduplicator(timedelta(seconds=30), clock.now)
+    register = RegisterEvent(uow, clock, board, deduplicator, presenter, notifier)
+    with pytest.raises(NotFoundError):
+        register.execute(RegisterEventCommand(camera_id=99, event_type_id=1))
+    assert notifier.published == []

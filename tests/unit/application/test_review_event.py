@@ -89,3 +89,15 @@ def test_alert_created_after_app_clock_is_closed_at_its_creation_time(
 def test_unknown_event(review):
     with pytest.raises(NotFoundError, match="Evento 99"):
         review.execute(99)
+
+
+def test_closing_is_published_once(uow, clock, board, presenter):
+    from safevision.application.dto import EVENT_CLOSED
+    from tests.fakes.notifier import RecordingNotifier
+
+    notifier = RecordingNotifier()
+    review = ReviewEvent(uow, clock, board, presenter, notifier)
+    event = pending_event(uow, clock, board, presenter)
+    view = review.execute(event.id)
+    review.execute(event.id)  # already closed: nothing new to tell
+    assert [(n.kind, n.event, n.alert) for n in notifier.published] == [(EVENT_CLOSED, view, None)]

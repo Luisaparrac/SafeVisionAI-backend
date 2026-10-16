@@ -21,9 +21,10 @@ UserRow
 email
 password_hash
 
-# Context manager protocol: __exit__ receives these arguments.
+# Parameters of protocol (port) methods and of __exit__, which only declare a signature.
 exc_type
 traceback
+notification
 
 # Enum members created from database values with parse().
 INACTIVE
