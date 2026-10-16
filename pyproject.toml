@@ -33,3 +33,14 @@ markers = [
 # Production code only: code used just by tests is dead too.
 paths = ["src", "scripts", "vulture_whitelist.py"]
 min_confidence = 0
+
+[tool.coverage.run]
+source = ["safevision"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Checked in CI, which runs with PostgreSQL (99 % when this floor was set).
+# Without a database the persistence adapters are not measured.
+fail_under = 95
