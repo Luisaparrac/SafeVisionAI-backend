@@ -1,0 +1,38 @@
+# Local stack: the backend image and a disposable PostgreSQL with the same
+# structure as production (tests/integration/schema.sql) and fictitious data.
+#
+#   cp .env.compose.example .env.compose
+#   docker compose up --build
+#
+# API on http://localhost:8000 (docs at /docs). Data lives in the "pgdata"
+# volume; "docker compose down --volumes" deletes it and the scripts run again.
+name: safevision
+
+services:
+  db:
+    image: postgres:16
+    env_file: .env.compose
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Run in name order, only when the volume is empty.
+      - ./tests/integration/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./scripts/seed_dev.sql:/docker-entrypoint-initdb.d/02-seed_dev.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    env_file: .env.compose
+    environment:
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

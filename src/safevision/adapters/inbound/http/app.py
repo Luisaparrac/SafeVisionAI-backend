@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from safevision.adapters.inbound.http.body_limit import BodyLimitMiddleware
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.errors import install_error_handlers
 from safevision.adapters.inbound.http.logging_setup import AccessLogMiddleware, configure_logging
@@ -19,6 +20,7 @@ from safevision.adapters.inbound.http.routers import (
     health,
 )
 from safevision.adapters.inbound.http.routers.eventos import DUPLICATE_HEADER
+from safevision.adapters.inbound.http.security_headers import SecurityHeadersMiddleware
 from safevision.adapters.inbound.http.websocket import router as websocket_router
 
 DESCRIPTION = (
@@ -51,6 +53,8 @@ def create_app(container: Container) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.container = container
+    app.add_middleware(BodyLimitMiddleware)  # innermost: its 413 gets the headers below
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(AccessLogMiddleware)  # inside RequestIdMiddleware: sees the id
     app.add_middleware(RequestIdMiddleware)
     # Added last, so it is the outermost middleware and also answers preflight requests.

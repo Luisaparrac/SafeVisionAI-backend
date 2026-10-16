@@ -44,3 +44,18 @@ def test_domain_errors_are_translated(container):
     response = TestClient(app).get("/prueba-error")
     assert response.status_code == 404
     assert response.json() == {"detail": "Evento 999 no existe"}
+
+
+def test_openapi_has_examples_for_the_iot_requests(client):
+    from safevision.adapters.inbound.http.schemas import CameraStatusIn, EventIn
+
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    event_examples = schemas["EventIn"]["examples"]
+    status_examples = schemas["CameraStatusIn"]["examples"]
+    assert event_examples[0]["event_type"] == "Caída"
+    assert status_examples == [{"status": "disconnected"}]
+    # The examples are valid requests.
+    for example in event_examples:
+        EventIn.model_validate(example)
+    for example in status_examples:
+        CameraStatusIn.model_validate(example)

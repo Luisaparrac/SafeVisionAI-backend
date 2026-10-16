@@ -109,3 +109,17 @@ def test_publishing_without_clients_or_with_a_closed_loop_never_raises():
     asyncio.run(subscribe())  # its loop is closed when run() returns
     broadcaster.publish(AlertNotification(EVENT_CLOSED, VIEW))
     assert len(broadcaster._clients) == 0
+
+
+def test_idle_feed_sends_keepalive_pings(client, monkeypatch):
+    import safevision.adapters.inbound.http.websocket as websocket
+
+    monkeypatch.setattr(websocket, "KEEPALIVE_SECONDS", 0.05)
+    with client.websocket_connect("/ws/alertas") as feed:
+        assert feed.receive_json() == {"tipo": "ping"}
+        assert feed.receive_json() == {"tipo": "ping"}
+        # A real message still arrives between pings.
+        client.post("/api/eventos", json={"camera_id": 1, "event_type_id": 4}, headers=KEY)
+        kinds = [feed.receive_json()["tipo"] for _ in range(5)]
+        assert "alerta_nueva" in kinds
+        assert set(kinds) <= {"ping", "alerta_nueva"}

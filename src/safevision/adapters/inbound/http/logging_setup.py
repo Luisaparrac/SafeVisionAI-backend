@@ -3,7 +3,8 @@
 Every line goes through ``redact`` before it is written, tracebacks included:
 credentials in connection URLs and values of fields such as the API key or a
 password are masked. The access log records method, path, status and
-duration; it leaves out the query string and the client address.
+duration of HTTP requests, and path and result of WebSocket connections;
+it leaves out the query string and the client address.
 """
 
 import logging
@@ -48,6 +49,21 @@ def configure_logging(level: str = "INFO") -> None:
     logger.propagate = False
     # Replaced by the access log below, which omits the query string and the client IP.
     logging.getLogger("uvicorn.access").disabled = True
+    server_log = logging.getLogger("uvicorn.error")
+    if not any(isinstance(f, WebSocketAccessFilter) for f in server_log.filters):
+        server_log.addFilter(WebSocketAccessFilter())
+
+
+class WebSocketAccessFilter(logging.Filter):
+    """Drops the WebSocket handshake lines uvicorn writes with the client address.
+
+    They look like ``192.0.2.7:38400 - "WebSocket /ws/alertas" [accepted]`` and go
+    to the "uvicorn.error" logger, so disabling "uvicorn.access" does not hide them.
+    AccessLogMiddleware records the same connection without the address.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return '"WebSocket ' not in str(record.msg)
 
 
 class AccessLogMiddleware:
@@ -56,6 +72,9 @@ class AccessLogMiddleware:
         self.logger = logging.getLogger(f"{LOGGER_NAME}.http")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "websocket":
+            await self._websocket(scope, receive, send)
+            return
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -79,3 +98,36 @@ class AccessLogMiddleware:
                 (time.perf_counter() - started) * 1000,
                 extra={"request_id": current_request_id()},
             )
+
+    async def _websocket(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Logs the handshake result and, for accepted connections, how long they lasted."""
+        started = time.perf_counter()
+        accepted = False
+        answered = False
+
+        def log(result: str, *duration: float) -> None:
+            text = "method=WS path=%s result=%s" + (" duration_ms=%.1f" if duration else "")
+            self.logger.info(
+                text, scope["path"], result, *duration, extra={"request_id": current_request_id()}
+            )
+
+        async def record_result(message: Message) -> None:
+            nonlocal accepted, answered
+            if not answered and message["type"] == "websocket.accept":
+                accepted = answered = True
+                log("accepted")
+            elif not answered and message["type"] in (
+                "websocket.close",
+                "websocket.http.response.start",
+            ):
+                answered = True
+                log("rejected")
+            await send(message)
+
+        try:
+            await self.app(scope, receive, record_result)
+        finally:
+            if accepted:
+                log("closed", (time.perf_counter() - started) * 1000)
+            elif not answered:
+                log("failed")

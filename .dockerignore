@@ -1,0 +1,23 @@
+# Only requirements.txt and src/ are needed to build the image.
+.git
+.github
+.venv
+venv
+.env
+.env.*
+!.env.compose.example
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+coverage.xml
+htmlcov
+tests
+docs
+scripts
+*.md
+CLAUDE.md
+PROGRESO.md
+.claude

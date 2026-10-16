@@ -10,7 +10,11 @@ Messages (JSON, Spanish keys like the rest of the API):
 
 * ``{"tipo": "alerta_nueva", "alerta": <AlertOut>}`` when an alert is raised;
 * ``{"tipo": "evento_revisado", "evento": <EventOut>}`` when an event is
-  reviewed or marked as a false alarm.
+  reviewed or marked as a false alarm;
+* ``{"tipo": "ping"}`` after ``KEEPALIVE_SECONDS`` without messages. Proxies
+  close connections that carry no data, and browsers do not expose protocol
+  pings to the page, so this lets the panel know the feed is alive. A send
+  that fails also reveals a client that left without closing.
 """
 
 import asyncio
@@ -25,6 +29,8 @@ from safevision.application.dto import NEW_ALERT, AlertNotification
 logger = logging.getLogger(__name__)
 
 QUEUE_SIZE = 100
+KEEPALIVE_SECONDS = 25.0
+PING = {"tipo": "ping"}
 
 
 def to_message(notification: AlertNotification) -> dict:
@@ -94,7 +100,11 @@ async def alerts_feed(websocket: WebSocket) -> None:
 
 async def _forward(queue: asyncio.Queue, websocket: WebSocket) -> None:
     while True:
-        await websocket.send_json(await queue.get())
+        try:
+            message = await asyncio.wait_for(queue.get(), timeout=KEEPALIVE_SECONDS)
+        except TimeoutError:
+            message = PING
+        await websocket.send_json(message)
 
 
 async def _until_disconnect(websocket: WebSocket) -> None:

@@ -7,6 +7,7 @@ from safevision.adapters.inbound.http.logging_setup import (
     FORMAT,
     LOGGER_NAME,
     RedactingFormatter,
+    WebSocketAccessFilter,
     configure_logging,
     redact,
 )
@@ -71,3 +72,56 @@ def test_access_log_has_request_id_but_no_query_string(client, caplog):
     assert "Rosa" not in message
     assert response.headers["x-request-id"] == "req-1"
     assert RedactingFormatter(FORMAT).format(record).count("request_id=req-1") == 1
+
+
+def test_websocket_connections_are_logged_without_the_client_address(client, caplog):
+    with (
+        caplog.at_level(logging.INFO, logger="safevision.http"),
+        client.websocket_connect("/ws/alertas", headers={"X-Request-ID": "ws-1"}) as feed,
+    ):
+        accepted_headers = dict(feed.extra_headers)
+    records = [r for r in caplog.records if r.name == "safevision.http"]
+    messages = [r.getMessage() for r in records]
+    assert messages[0] == "method=WS path=/ws/alertas result=accepted"
+    assert messages[1].startswith("method=WS path=/ws/alertas result=closed duration_ms=")
+    assert all(r.request_id == "ws-1" for r in records)
+    assert not any("testclient" in m for m in messages)  # the client address of TestClient
+    assert accepted_headers[b"x-request-id"] == b"ws-1"
+
+
+def test_unknown_websocket_path_is_logged_as_rejected(client, caplog):
+    import pytest
+    from starlette.websockets import WebSocketDisconnect
+
+    with (
+        caplog.at_level(logging.INFO, logger="safevision.http"),
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect("/ws/otra"),
+    ):
+        pass
+    [record] = [r for r in caplog.records if r.name == "safevision.http"]
+    assert record.getMessage() == "method=WS path=/ws/otra result=rejected"
+
+
+def test_uvicorn_websocket_lines_with_the_address_are_dropped():
+    drop = WebSocketAccessFilter()
+
+    def record(msg, *args):
+        return logging.LogRecord("uvicorn.error", logging.INFO, __file__, 1, msg, args, None)
+
+    assert not drop.filter(record('%s - "WebSocket %s" [accepted]', "192.0.2.7:38400", "/ws"))
+    assert not drop.filter(record('%s - "WebSocket %s" 403', "192.0.2.7:38400", "/ws"))
+    assert drop.filter(record("Started server process [%d]", 42))
+    assert drop.filter(record("connection open"))
+
+
+def test_configure_logging_installs_the_filter_once(restore_logging):
+    server_log = logging.getLogger("uvicorn.error")
+    before = list(server_log.filters)
+    try:
+        configure_logging()
+        configure_logging()
+        added = [f for f in server_log.filters if isinstance(f, WebSocketAccessFilter)]
+        assert len(added) == 1
+    finally:
+        server_log.filters[:] = before

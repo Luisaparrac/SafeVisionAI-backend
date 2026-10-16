@@ -66,3 +66,27 @@ jobs:
         run: pytest -m smoke
         env:
           SMOKE_BIN_DIR: /tmp/production/bin
+
+  docker:
+    # The local stack: production image + PostgreSQL with schema.sql and sample data.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image and start the stack
+        run: |
+          cp .env.compose.example .env.compose
+          docker compose up --build --detach --wait --wait-timeout 180
+      - name: Health and sample data
+        run: |
+          curl --fail --silent --show-error http://localhost:8000/health
+          curl --fail --silent --show-error http://localhost:8000/health/ready
+          types=$(curl --fail --silent --show-error http://localhost:8000/api/tipos-evento)
+          echo "$types" | python3 -c "import json, sys; assert len(json.load(sys.stdin)) == 4"
+      - name: The server does not run as root
+        run: test "$(docker compose exec -T api id -u)" != "0"
+      - name: Logs
+        if: failure()
+        run: docker compose logs
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes

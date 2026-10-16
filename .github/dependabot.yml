@@ -1,0 +1,26 @@
+# Weekly update proposals as pull requests; the CI (tests, smoke with only
+# requirements.txt, Docker) must pass before merging any of them.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      # Development tools change often and do not reach production: one PR for all.
+      development-tools:
+        patterns: ["pytest*", "ruff", "mypy", "vulture", "pre-commit", "httpx*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
