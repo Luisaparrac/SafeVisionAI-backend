@@ -51,7 +51,7 @@ Interactive docs: http://localhost:8000/docs
 Send a test event (simulates the IoT module):
 
 ```bash
-python scripts/simulate_event.py --key YOUR_IOT_API_KEY
+python scripts/simulate_event.py --url http://localhost:8000 --key YOUR_IOT_API_KEY
 ```
 
 ## Endpoints
