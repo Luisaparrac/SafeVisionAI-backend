@@ -88,3 +88,31 @@ def test_empty_type_list_matches_nothing(repo):
     repo.add(new_event())
     assert repo.find(EventFilter(event_type_ids=())) == []
     assert repo.count(EventFilter(event_type_ids=())) == 0
+
+
+def test_find_and_count_by_camera(repo):
+    repo.add(new_event(camera_id=1))
+    repo.add(new_event(camera_id=2, minutes=1))
+    repo.add(new_event(camera_id=1, minutes=2))
+    assert [e.id for e in repo.find(EventFilter(camera_ids=(1,)))] == [3, 1]
+    assert repo.count(EventFilter(camera_ids=(2,))) == 1
+    assert repo.find(EventFilter(camera_ids=())) == []
+
+
+def test_find_by_time_range(repo):
+    repo.add(new_event(minutes=0))
+    repo.add(new_event(minutes=10))
+    repo.add(new_event(minutes=20))
+    window = EventFilter(
+        occurred_from=T0 + timedelta(minutes=10), occurred_before=T0 + timedelta(minutes=20)
+    )
+    assert [e.id for e in repo.find(window)] == [2]
+    assert repo.count(EventFilter(occurred_from=T0 + timedelta(minutes=10))) == 2
+
+
+def test_find_pages_with_offset_and_limit(repo):
+    for minutes in range(5):
+        repo.add(new_event(minutes=minutes))
+    assert [e.id for e in repo.find(ALL, limit=2, offset=1)] == [4, 3]
+    assert [e.id for e in repo.find(ALL, offset=3)] == [2, 1]
+    assert repo.find(ALL, limit=2, offset=10) == []

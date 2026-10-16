@@ -1,8 +1,10 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from safevision.application.use_cases.list_events import ListEvents
+from safevision.domain.errors import ValidationError
 from safevision.domain.model.event import Event
 
 
@@ -71,3 +73,52 @@ def test_text_search(list_events, q, expected):
 
 def test_blank_text_matches_everything(list_events):
     assert len(list_events.execute(q="   ")) == 5
+
+
+def test_filter_by_camera(list_events):
+    assert ids(list_events.execute(camera_id=2)) == [3]
+    assert ids(list_events.execute(camera_id=1, status="Pendiente")) == [4, 1]
+    assert list_events.execute(camera_id=99) == []
+
+
+BOGOTA = ZoneInfo("America/Bogota")
+
+
+@pytest.fixture
+def by_date(uow, presenter) -> ListEvents:
+    """Events at local (Bogotá) times around two midnights."""
+    for local in [
+        datetime(2026, 10, 13, 23, 59, tzinfo=BOGOTA),
+        datetime(2026, 10, 14, 0, 0, tzinfo=BOGOTA),
+        datetime(2026, 10, 14, 23, 59, 59, tzinfo=BOGOTA),
+        datetime(2026, 10, 15, 0, 0, tzinfo=BOGOTA),
+    ]:
+        uow.events.add(Event(camera_id=1, event_type_id=1, occurred_at=local))
+    uow.commit()
+    return ListEvents(uow, presenter)
+
+
+def test_filter_by_dates_uses_local_days_inclusive(by_date):
+    day = date(2026, 10, 14)
+    assert ids(by_date.execute(date_from=day, date_to=day)) == [3, 2]
+    assert ids(by_date.execute(date_from=day)) == [4, 3, 2]
+    assert ids(by_date.execute(date_to=day)) == [3, 2, 1]
+    assert by_date.execute(date_from=date(2026, 11, 1)) == []
+
+
+def test_reversed_dates_are_rejected(by_date):
+    with pytest.raises(ValidationError):
+        by_date.execute(date_from=date(2026, 10, 15), date_to=date(2026, 10, 14))
+
+
+def test_pagination(list_events):
+    assert ids(list_events.execute(limit=2)) == [5, 4]
+    assert ids(list_events.execute(limit=2, offset=2)) == [3, 2]
+    assert ids(list_events.execute(offset=4)) == [1]
+    assert ids(list_events.execute(status="Revisado", limit=1, offset=1)) == [2]
+
+
+def test_pagination_applies_after_the_text_search(list_events):
+    # Only events 1 (Rosa) and 4 (Escalera) match; the page is cut from those.
+    assert ids(list_events.execute(q="a", limit=1)) == ids(list_events.execute(q="a"))[:1]
+    assert ids(list_events.execute(q="rosa", offset=1)) == []

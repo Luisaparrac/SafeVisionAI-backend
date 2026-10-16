@@ -5,6 +5,7 @@ when the surrounding unit of work commits.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from safevision.domain.model.alert import Alert
@@ -23,6 +24,9 @@ class EventFilter:
 
     statuses: tuple[EventStatus, ...] | None = None
     event_type_ids: tuple[int, ...] | None = None
+    camera_ids: tuple[int, ...] | None = None
+    occurred_from: datetime | None = None  # inclusive
+    occurred_before: datetime | None = None  # exclusive
 
 
 @runtime_checkable
@@ -39,8 +43,11 @@ class EventRepository(Protocol):
         """Saves the changes of an existing event (raises NotFoundError if missing)."""
         ...
 
-    def find(self, criteria: EventFilter, limit: int | None = None) -> list[Event]:
-        """Matching events, newest first (by occurrence time, then by id)."""
+    def find(self, criteria: EventFilter, limit: int | None = None, offset: int = 0) -> list[Event]:
+        """Matching events, newest first (by occurrence time, then by id).
+
+        ``offset`` skips that many events and ``limit`` caps the result (None: no cap).
+        """
         ...
 
     def count(self, criteria: EventFilter) -> int:

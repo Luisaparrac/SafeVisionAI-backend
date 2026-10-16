@@ -15,6 +15,7 @@ from safevision.application.presenter import EventPresenter
 from safevision.application.services.alert_board import AlertBoard
 from safevision.application.services.event_deduplicator import EventDeduplicator
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
+from safevision.application.use_cases.mark_false_alarm import MarkFalseAlarm
 from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoard
 from safevision.application.use_cases.register_event import RegisterEvent, RegisterEventCommand
 from safevision.application.use_cases.review_event import ReviewEvent
@@ -32,6 +33,7 @@ def wiring(pg_seeded):
     return {
         "register": RegisterEvent(uow, clock, board, deduplicator, presenter),
         "review": ReviewEvent(uow, clock, board, presenter),
+        "false_alarm": MarkFalseAlarm(uow, clock, board, presenter),
         "pending": GetPendingAlerts(uow, board, presenter),
         "rebuild": RebuildAlertBoard(uow, AlertBoard(history_capacity=10), presenter),
         "engine": pg_seeded,
@@ -74,3 +76,14 @@ def test_rebuild_reads_open_events_from_the_database(wiring):
     wiring["register"].execute(RegisterEventCommand(camera_id=1, event_type_id=3))
     wiring["register"].execute(RegisterEventCommand(camera_id=2, event_type_id=1, subject_id=1))
     assert wiring["rebuild"].execute() == 2
+
+
+def test_false_alarm_dismisses_the_alert_satisfying_the_constraints(wiring):
+    view = wiring["register"].execute(RegisterEventCommand(camera_id=1, event_type_id=1)).view
+    wiring["false_alarm"].execute(view.id)
+    with Session(wiring["engine"]) as session:
+        event = session.get(EventRow, view.id)
+        alert = session.scalars(select(AlertRow)).one()
+    assert event.status == "false_alarm"
+    assert alert.status == "dismissed"
+    assert alert.attended_at >= alert.created_at

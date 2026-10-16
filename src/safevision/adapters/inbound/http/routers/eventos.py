@@ -1,5 +1,7 @@
 """Events: detections registered by the IoT module and reviewed from the panel."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, Response
 
 from safevision.adapters.inbound.http.container import Container
@@ -11,6 +13,8 @@ router = APIRouter(prefix="/api/eventos", tags=["eventos"])
 
 # Sent when a repeated detection reused a recent event instead of creating one.
 DUPLICATE_HEADER = "X-Duplicate"
+# Optional pagination of /api/eventos; without limit the whole history is returned, as before.
+MAX_PAGE_SIZE = 500
 
 
 @router.get("", response_model=list[EventOut])
@@ -18,10 +22,24 @@ def list_events(
     q: str | None = None,
     prioridad: str | None = Query(None, description="Alto, Medio o Bajo"),
     estado: str | None = Query(None, description="Pendiente o Revisado"),
+    camara_id: int | None = Query(None, description="Solo eventos de esta cámara"),
+    desde: date | None = Query(None, description="Fecha local inicial (AAAA-MM-DD), inclusive"),
+    hasta: date | None = Query(None, description="Fecha local final (AAAA-MM-DD), inclusive"),
+    limit: int | None = Query(None, ge=1, le=MAX_PAGE_SIZE, description="Tamaño de página"),
+    offset: int = Query(0, ge=0, description="Eventos que se saltan"),
     container: Container = Depends(get_container),
 ) -> list[EventOut]:
     """Newest first. ``q`` searches the id, type, subject and location."""
-    views = container.list_events.execute(q=q, priority=prioridad, status=estado)
+    views = container.list_events.execute(
+        q=q,
+        priority=prioridad,
+        status=estado,
+        camera_id=camara_id,
+        date_from=desde,
+        date_to=hasta,
+        limit=limit,
+        offset=offset,
+    )
     return [EventOut.from_view(view) for view in views]
 
 
@@ -63,3 +81,16 @@ def register_event(
 def review_event(event_id: int, container: Container = Depends(get_container)) -> EventOut:
     """Marks the event as reviewed and closes its alerts; repeating it changes nothing."""
     return EventOut.from_view(container.review_event.execute(event_id))
+
+
+@router.patch(
+    "/{event_id}/falsa-alarma",
+    response_model=EventOut,
+    responses={409: {"description": "El evento ya fue resuelto"}},
+)
+def mark_false_alarm(event_id: int, container: Container = Depends(get_container)) -> EventOut:
+    """Closes the event as a false alarm and dismisses its alerts; repeating it changes nothing.
+
+    An event already resolved keeps the result of its review (409).
+    """
+    return EventOut.from_view(container.mark_false_alarm.execute(event_id))

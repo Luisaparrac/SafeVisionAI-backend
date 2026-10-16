@@ -45,3 +45,5 @@ jobs:
         run: ruff format --check .
       - name: Tests (unit, contract and integration)
         run: pytest
+      - name: Smoke test of the render.yaml start command
+        run: pytest -m smoke

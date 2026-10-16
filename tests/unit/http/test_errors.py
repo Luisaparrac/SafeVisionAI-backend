@@ -3,6 +3,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from safevision.adapters.inbound.http.errors import install_error_handlers, status_for
+from safevision.application.errors import (
+    PersistenceError,
+    StorageConflictError,
+    StorageUnavailableError,
+)
 from safevision.domain.errors import (
     DomainError,
     InvalidTransitionError,
@@ -50,3 +55,39 @@ def test_subclasses_use_the_status_of_their_parent():
         pass
 
     assert status_for(MissingCamera("Cámara", 1)) == 404
+
+
+FAILURES = {
+    "unavailable": StorageUnavailableError(),
+    "conflict": StorageConflictError(),
+    "persistence": PersistenceError(),
+    "bug": KeyError("secreto interno"),
+}
+
+
+@pytest.fixture
+def failing_client() -> TestClient:
+    app = FastAPI()
+    install_error_handlers(app)
+
+    @app.get("/infra/{kind}")
+    def fail(kind: str) -> None:
+        raise FAILURES[kind]
+
+    return TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.mark.parametrize(
+    ("kind", "status"),
+    [("unavailable", 503), ("conflict", 409), ("persistence", 500), ("bug", 500)],
+)
+def test_infrastructure_errors_hide_internal_details(failing_client, kind, status):
+    response = failing_client.get(f"/infra/{kind}")
+    assert response.status_code == status
+    detail = response.json()["detail"]
+    assert isinstance(detail, str)
+    assert "secreto" not in detail
+
+
+def test_unexpected_errors_get_a_generic_message(failing_client):
+    assert failing_client.get("/infra/bug").json() == {"detail": "Error interno del servidor"}

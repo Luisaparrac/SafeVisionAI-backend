@@ -73,6 +73,11 @@ class EventPresenter:
     def __init__(self, timezone: tzinfo) -> None:
         self._timezone = timezone
 
+    @property
+    def timezone(self) -> tzinfo:
+        """Time zone in which dates are shown (and read, in the filters)."""
+        return self._timezone
+
     def present(self, uow: UnitOfWork, event: Event) -> EventView:
         return self.present_many(uow, [event])[0]
 

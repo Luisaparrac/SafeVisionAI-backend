@@ -131,3 +131,17 @@ def test_catalog_outputs():
         "is_active": True,
         "camera_id": 1,
     }
+
+
+@pytest.mark.parametrize(
+    ("field", "limit"),
+    [
+        ("description", schemas.MAX_DESCRIPTION_LENGTH),
+        ("evidence_url", schemas.MAX_EVIDENCE_URL_LENGTH),
+    ],
+)
+def test_text_fields_have_a_size_limit(field, limit):
+    accepted = schemas.EventIn.model_validate({"camera_id": 1, field: "x" * limit})
+    assert len(getattr(accepted, field)) == limit
+    with pytest.raises(ValidationError):
+        schemas.EventIn.model_validate({"camera_id": 1, field: "x" * (limit + 1)})

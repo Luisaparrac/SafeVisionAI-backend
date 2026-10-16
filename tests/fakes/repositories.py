@@ -59,10 +59,10 @@ class InMemoryEventRepository(InMemoryStore[Event]):
     def __init__(self) -> None:
         super().__init__("Evento")
 
-    def find(self, criteria: EventFilter, limit: int | None = None) -> list[Event]:
+    def find(self, criteria: EventFilter, limit: int | None = None, offset: int = 0) -> list[Event]:
         rows = [event for event in self.all() if self._matches(event, criteria)]
         rows.sort(key=lambda e: (e.occurred_at, e.id), reverse=True)
-        return rows if limit is None else rows[:limit]
+        return rows[offset:] if limit is None else rows[offset : offset + limit]
 
     def count(self, criteria: EventFilter) -> int:
         return len(self.find(criteria))
@@ -70,6 +70,12 @@ class InMemoryEventRepository(InMemoryStore[Event]):
     @staticmethod
     def _matches(event: Event, criteria: EventFilter) -> bool:
         if criteria.statuses is not None and event.status not in criteria.statuses:
+            return False
+        if criteria.camera_ids is not None and event.camera_id not in criteria.camera_ids:
+            return False
+        if criteria.occurred_from is not None and event.occurred_at < criteria.occurred_from:
+            return False
+        if criteria.occurred_before is not None and event.occurred_at >= criteria.occurred_before:
             return False
         return criteria.event_type_ids is None or event.event_type_id in criteria.event_type_ids
 

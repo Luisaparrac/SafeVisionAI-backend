@@ -88,3 +88,53 @@ def test_detection_after_the_window_is_a_new_event(client, clock, settings):
 def test_browsers_can_read_the_duplicate_header(client):
     response = client.get("/health", headers={"Origin": "http://localhost:5173"})
     assert "X-Duplicate" in response.headers["access-control-expose-headers"]
+
+
+def test_oversized_description_is_rejected_before_storing(client, uow):
+    body = {"camera_id": 1, "event_type_id": 1, "description": "x" * 2001}
+    response = client.post("/api/eventos", json=body, headers=KEY)
+    assert response.status_code == 422
+    assert uow.events.all() == []
+
+
+def test_filter_by_camera(client, clock):
+    sala = post(client, camera_id=1, event_type_id=3)
+    clock.advance(1)
+    patio = post(client, camera_id=2, event_type_id=3)
+    assert client.get("/api/eventos", params={"camara_id": 2}).json() == [patio]
+    assert client.get("/api/eventos", params={"camara_id": 1}).json() == [sala]
+    assert client.get("/api/eventos", params={"camara_id": 99}).json() == []
+    combined = client.get("/api/eventos", params={"camara_id": 1, "prioridad": "Alto"})
+    assert combined.json() == []
+    assert client.get("/api/eventos", params={"camara_id": "sala"}).status_code == 422
+
+
+def test_filter_by_dates(client, clock):
+    # FakeClock: 2026-10-14 12:00 UTC, 07:00 in Bogotá.
+    today = post(client, camera_id=1, event_type_id=3)
+    clock.advance(24 * 3600)
+    tomorrow = post(client, camera_id=1, event_type_id=3)
+    params = {"desde": "2026-10-14", "hasta": "2026-10-14"}
+    assert client.get("/api/eventos", params=params).json() == [today]
+    assert client.get("/api/eventos", params={"desde": "2026-10-15"}).json() == [tomorrow]
+    reversed_range = client.get(
+        "/api/eventos", params={"desde": "2026-10-15", "hasta": "2026-10-14"}
+    )
+    assert reversed_range.status_code == 422
+    assert client.get("/api/eventos", params={"desde": "14/10/2026"}).status_code == 422
+
+
+def test_pagination_is_optional(client, clock):
+    created = []
+    for event_type_id in (1, 2, 3, 4):
+        created.append(post(client, camera_id=1, event_type_id=event_type_id))
+        clock.advance(1)
+    newest_first = [e["id"] for e in reversed(created)]
+    assert [e["id"] for e in client.get("/api/eventos").json()] == newest_first
+    page = client.get("/api/eventos", params={"limit": 2, "offset": 1}).json()
+    assert [e["id"] for e in page] == newest_first[1:3]
+
+
+@pytest.mark.parametrize("params", [{"limit": 0}, {"limit": 501}, {"offset": -1}])
+def test_pagination_bounds(client, params):
+    assert client.get("/api/eventos", params=params).status_code == 422

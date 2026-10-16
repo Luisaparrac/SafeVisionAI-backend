@@ -64,6 +64,11 @@ class MetricsOut(BaseModel):
         return cls(total=metrics.total, pendientes=metrics.pending, alto=metrics.high)
 
 
+# The columns have no limit; these keep one request from storing arbitrary amounts of text.
+MAX_DESCRIPTION_LENGTH = 2000
+MAX_EVIDENCE_URL_LENGTH = 2048
+
+
 class EventIn(BaseModel):
     """What the IoT module sends when it detects something."""
 
@@ -74,8 +79,8 @@ class EventIn(BaseModel):
     zone_id: int | None = None
     detected_class: Literal["person", "dog", "cat", "other_animal"] = "person"
     confidence: float | None = Field(None, ge=0, le=1)
-    evidence_url: str | None = None
-    description: str | None = None
+    evidence_url: str | None = Field(None, max_length=MAX_EVIDENCE_URL_LENGTH)
+    description: str | None = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
 
     def to_command(self) -> RegisterEventCommand:
         return RegisterEventCommand(**self.model_dump())
