@@ -52,7 +52,7 @@ def call(base: str, method: str, path: str, body: dict | None = None, key: str |
 
 
 @pytest.fixture
-def server(pg_seeded):
+def server(pg_seeded, tmp_path):
     port = free_port()
     args = shlex.split(start_command().replace("$PORT", str(port)))
     # The executable of this environment (the platform runs it from its PATH).
@@ -66,20 +66,23 @@ def server(pg_seeded):
         "TIMEZONE": "America/Bogota",
         "PORT": str(port),
     }
+    # A file, not a pipe: nobody reads the output while the server runs, and a full
+    # pipe would block the server once it has logged enough lines.
+    output = (tmp_path / "server.log").open("w+", encoding="utf-8")
     process = subprocess.Popen(
         [executable, *args[1:]],
         cwd=ROOT,
         env=env,
-        stdout=subprocess.PIPE,
+        stdout=output,
         stderr=subprocess.STDOUT,
-        text=True,
     )
     base = f"http://127.0.0.1:{port}"
     try:
         deadline = time.monotonic() + 30
         while True:
             if process.poll() is not None:
-                pytest.fail(f"the server stopped:\n{process.stdout.read()}", pytrace=False)
+                output.seek(0)
+                pytest.fail(f"the server stopped:\n{output.read()}", pytrace=False)
             try:
                 if call(base, "GET", "/health")[0] == 200:
                     break
@@ -92,6 +95,7 @@ def server(pg_seeded):
     finally:
         process.terminate()
         process.wait(timeout=10)
+        output.close()
 
 
 def test_start_command_serves_the_contract(server):
