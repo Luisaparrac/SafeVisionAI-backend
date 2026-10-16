@@ -4,8 +4,6 @@ import pytest
 
 from tests.contract.conftest import KEY
 
-pytestmark = pytest.mark.integration
-
 
 def test_event_types_most_severe_first(client):
     response = client.get("/api/tipos-evento")

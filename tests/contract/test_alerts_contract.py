@@ -4,8 +4,6 @@ import pytest
 
 from tests.contract.conftest import EVENT_KEYS, post_event
 
-pytestmark = pytest.mark.integration
-
 
 @pytest.fixture
 def events(client) -> dict[str, dict]:

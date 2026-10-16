@@ -6,8 +6,6 @@ import pytest
 
 from tests.contract.conftest import EVENT_KEYS, KEY, post_event
 
-pytestmark = pytest.mark.integration
-
 
 def test_register_minimal_event(client):
     response = client.post(

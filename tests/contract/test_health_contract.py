@@ -1,9 +1,5 @@
 """Contract: service information, liveness and CORS."""
 
-import pytest
-
-pytestmark = pytest.mark.integration
-
 
 def test_root_describes_the_service(client):
     response = client.get("/")
