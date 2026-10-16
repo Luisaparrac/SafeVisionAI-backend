@@ -66,3 +66,16 @@ def test_production_container_uses_postgres_and_the_system_clock_without_connect
     register = container.register_event
     assert isinstance(register._uow, SqlAlchemyUnitOfWork)
     assert isinstance(register._clock, SystemClock)
+
+
+def test_window_counts_from_the_first_detection():
+    # A situation that lasts produces one alert per window, not one per detection.
+    clock = FakeClock()
+    container = build(clock)
+    command = RegisterEventCommand(camera_id=1, event_type_id=2)
+    first = container.register_event.execute(command).view.id
+    for _ in range(5):
+        clock.advance(SETTINGS.dedup_window_seconds / 5 - 1)
+        assert container.register_event.execute(command).view.id == first
+    clock.advance(5)
+    assert container.register_event.execute(command).created is True

@@ -12,7 +12,7 @@ def test_defaults_when_only_required_variables_are_set():
     assert settings.frontend_origins == ("http://localhost:5173",)
     assert settings.timezone == "America/Bogota"
     assert settings.history_capacity == 100
-    assert settings.dedup_window_seconds == 10.0
+    assert settings.dedup_window_seconds == 60.0
 
 
 def test_every_variable_is_read():
@@ -63,3 +63,7 @@ def test_secrets_are_not_shown_in_repr():
     text = repr(Settings.from_env(REQUIRED))
     assert "test-key" not in text
     assert "postgresql://" not in text
+
+
+def test_deduplication_can_be_disabled():
+    assert Settings.from_env(REQUIRED | {"DEDUP_WINDOW_SECONDS": "0"}).dedup_window_seconds == 0

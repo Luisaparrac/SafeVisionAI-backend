@@ -16,12 +16,19 @@ class ConfigurationError(RuntimeError):
 
 @dataclass(frozen=True)
 class Settings:
+    """Only DATABASE_URL and IOT_API_KEY are required; the rest have safe defaults.
+
+    ``dedup_window_seconds`` defaults to 60: the window counts from the first
+    detection of a situation, so a short window would raise a new alert every
+    few seconds while the same situation lasts. 0 disables deduplication.
+    """
+
     database_url: str = field(repr=False)
     iot_api_key: str = field(repr=False)
     frontend_origins: tuple[str, ...] = ("http://localhost:5173",)
     timezone: str = "America/Bogota"
     history_capacity: int = 100
-    dedup_window_seconds: float = 10.0
+    dedup_window_seconds: float = 60.0
 
     def __post_init__(self) -> None:
         for name in ("database_url", "iot_api_key"):
