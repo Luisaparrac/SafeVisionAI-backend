@@ -3,8 +3,10 @@
 import threading
 
 import pytest
+from sqlalchemy.exc import OperationalError
 
 from safevision.adapters.outbound.persistence.unit_of_work import SqlAlchemyUnitOfWork
+from safevision.application.errors import StorageUnavailableError
 from safevision.application.ports.unit_of_work import UnitOfWork
 
 
@@ -106,3 +108,30 @@ def test_threads_get_independent_sessions(factory):
         thread.join()
     assert seen["a"] is not seen["b"]
     assert all(s.calls == ["rollback", "close"] for s in factory.sessions)
+
+
+def connection_lost() -> OperationalError:
+    return OperationalError("SELECT 1", {}, Exception("host=db.example.com password=x"))
+
+
+def test_database_errors_leave_the_block_as_application_errors(factory, caplog):
+    uow = SqlAlchemyUnitOfWork(factory)
+    with pytest.raises(StorageUnavailableError) as info, uow:
+        raise connection_lost()
+    assert info.value.__cause__ is None
+    assert info.value.__suppress_context__
+    assert "db.example.com" not in caplog.text
+    assert factory.sessions[0].calls == ["rollback", "close"]
+
+
+def test_a_failing_rollback_still_closes_the_session(factory):
+    uow = SqlAlchemyUnitOfWork(factory)
+
+    def broken_rollback() -> None:
+        raise connection_lost()
+
+    with pytest.raises(StorageUnavailableError), uow:
+        session = factory.sessions[0]
+        session.rollback = broken_rollback
+        raise connection_lost()
+    assert session.calls == ["close"]

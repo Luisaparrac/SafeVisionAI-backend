@@ -3,14 +3,21 @@
 One instance is shared by every use case, while the HTTP server runs requests
 in several threads. Each thread therefore gets its own session and
 repositories, kept in thread-local storage for the length of the ``with``.
+
+A database exception raised inside the block leaves it as an application
+error (see ``errors.translate``); only its class name is logged, because the
+driver message may contain SQL parameters, the host or the user.
 """
 
+import logging
 import threading
 from types import TracebackType
 from typing import Self
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from safevision.adapters.outbound.persistence.errors import translate
 from safevision.adapters.outbound.persistence.repositories import (
     SqlAlchemyAlertRepository,
     SqlAlchemyCameraRepository,
@@ -18,6 +25,8 @@ from safevision.adapters.outbound.persistence.repositories import (
     SqlAlchemyEventRepository,
     SqlAlchemyEventTypeRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _Transaction:
@@ -51,8 +60,13 @@ class SqlAlchemyUnitOfWork:
         self._local.transaction = None
         try:
             transaction.session.rollback()
+        except SQLAlchemyError:
+            pass  # the connection may be gone; closing the session releases it anyway
         finally:
             transaction.session.close()
+        if isinstance(exc, SQLAlchemyError):
+            logger.error("database error: %s", type(exc).__name__)
+            raise translate(exc) from None
 
     def commit(self) -> None:
         self._current().session.commit()

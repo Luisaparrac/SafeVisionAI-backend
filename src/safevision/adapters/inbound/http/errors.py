@@ -1,12 +1,21 @@
-"""Translation of domain errors to HTTP responses.
+"""Translation of domain and infrastructure errors to HTTP responses.
 
-The body keeps the shape FastAPI already uses, ``{"detail": "..."}``, with the
-Spanish message written by the domain.
+The body keeps the shape FastAPI already uses, ``{"detail": "..."}``, with a
+Spanish message. Infrastructure failures and unexpected errors never expose
+internal details: the client gets a generic message and the logs only the
+error class and the request id.
 """
+
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from safevision.application.errors import (
+    PersistenceError,
+    StorageConflictError,
+    StorageUnavailableError,
+)
 from safevision.domain.errors import (
     DomainError,
     InvalidTransitionError,
@@ -34,5 +43,28 @@ async def domain_error_handler(_: Request, error: Exception) -> JSONResponse:
     return JSONResponse(status_code=status_for(error), content={"detail": error.message})
 
 
+logger = logging.getLogger(__name__)
+
+STATUS_BY_PERSISTENCE_ERROR: dict[type[PersistenceError], int] = {
+    StorageUnavailableError: 503,
+    StorageConflictError: 409,
+}
+INTERNAL_ERROR_MESSAGE = "Error interno del servidor"
+
+
+async def persistence_error_handler(_: Request, error: Exception) -> JSONResponse:
+    assert isinstance(error, PersistenceError)
+    status = STATUS_BY_PERSISTENCE_ERROR.get(type(error), 500)
+    logger.warning("persistence error: %s", type(error).__name__)
+    return JSONResponse(status_code=status, content={"detail": error.message})
+
+
+async def unexpected_error_handler(_: Request, error: Exception) -> JSONResponse:
+    logger.error("unexpected error: %s", type(error).__name__)
+    return JSONResponse(status_code=500, content={"detail": INTERNAL_ERROR_MESSAGE})
+
+
 def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, domain_error_handler)
+    app.add_exception_handler(PersistenceError, persistence_error_handler)
+    app.add_exception_handler(Exception, unexpected_error_handler)
