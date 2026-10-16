@@ -35,14 +35,16 @@ class RequestIdMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
         request_id = accepted_id(Headers(scope=scope).get(REQUEST_ID_HEADER))
         token = _current.set(request_id)
 
         async def send_with_id(message: Message) -> None:
-            if message["type"] == "http.response.start":
+            # The WebSocket handshake answer carries the id like any HTTP response.
+            if message["type"] in ("http.response.start", "websocket.accept"):
+                message.setdefault("headers", [])
                 MutableHeaders(scope=message)[REQUEST_ID_HEADER] = request_id
             await send(message)
 
