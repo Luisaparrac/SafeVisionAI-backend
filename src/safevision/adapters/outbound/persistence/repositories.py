@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from safevision.adapters.outbound.persistence import mappers
 from safevision.adapters.outbound.persistence.orm import (
+    AlertRow,
     CameraRow,
     EventRow,
     EventTypeRow,
@@ -18,6 +19,7 @@ from safevision.adapters.outbound.persistence.orm import (
 )
 from safevision.application.ports.repositories import EventFilter
 from safevision.domain.errors import NotFoundError
+from safevision.domain.model.alert import Alert
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
@@ -139,3 +141,31 @@ def _filtered[S: Select](statement: S, criteria: EventFilter) -> S:
     if criteria.event_type_ids is not None:
         statement = statement.where(EventRow.event_type_id.in_(criteria.event_type_ids))
     return statement
+
+
+class SqlAlchemyAlertRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, alert_id: int) -> Alert | None:
+        row = self._session.get(AlertRow, alert_id)
+        return None if row is None else mappers.alert_to_domain(row)
+
+    def add(self, alert: Alert) -> Alert:
+        row = mappers.alert_to_row(alert)
+        self._session.add(row)
+        self._session.flush()
+        return mappers.alert_to_domain(row)
+
+    def update(self, alert: Alert) -> None:
+        row = None if alert.id is None else self._session.get(AlertRow, alert.id)
+        if row is None:
+            raise NotFoundError("Alerta", alert.id)
+        mappers.apply_alert(alert, row)
+        self._session.flush()
+
+    def find_by_event(self, event_id: int) -> list[Alert]:
+        rows = self._session.scalars(
+            select(AlertRow).where(AlertRow.event_id == event_id).order_by(AlertRow.alert_id)
+        )
+        return [mappers.alert_to_domain(row) for row in rows]
