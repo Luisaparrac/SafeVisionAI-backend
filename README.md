@@ -67,25 +67,53 @@ muestra el panel:
 | `events.status` resolved / false_alarm | Revisado |
 | `event_types.severity_level` 3–4 / 2 / 1 | Alto / Medio / Bajo |
 
-## Run locally
+## Ejecución local
 
-Your public IP must be allowed in the database firewall first.
+Se necesita Python 3.12 (la versión de producción) o Docker.
+
+### Con Docker
+
+Levanta el backend con un PostgreSQL local que ya tiene la estructura de la base
+(`tests/integration/schema.sql`) y datos de ejemplo ficticios
+(`scripts/seed_dev.sql`). No hace falta ninguna credencial real.
+
+```bash
+cp .env.compose.example .env.compose     # valores solo de desarrollo
+docker compose up --build
+```
+
+- API en http://localhost:8000 y documentación interactiva en http://localhost:8000/docs.
+- La clave del módulo IoT es la de `.env.compose` (`IOT_API_KEY`).
+- `docker compose down --volumes` borra la base local; al volver a subir se
+  cargan otra vez el esquema y los datos de ejemplo.
+
+La imagen (`Dockerfile`) instala solo `requirements.txt` y arranca con el mismo
+comando que `render.yaml`, así que se comporta como producción.
+
+### Con un entorno virtual
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-copy .env.example .env             # macOS/Linux: cp .env.example .env
-# edit .env with your connection data (password URL-encoded: ! -> %21)
+.venv\Scripts\activate                 # macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt    # app + herramientas de desarrollo
+copy .env.example .env                 # macOS/Linux: cp .env.example .env
+# Edita .env: DATABASE_URL e IOT_API_KEY (ver "Variables de entorno")
 uvicorn safevision.adapters.inbound.http.app:app --app-dir src --reload
 ```
 
-Interactive docs: http://localhost:8000/docs
+`DATABASE_URL` puede apuntar al PostgreSQL de `docker compose` o a la base del
+equipo; en ese caso la IP pública de tu equipo debe estar permitida en el
+firewall de la base. `.env` está en `.gitignore` y nunca se sube.
 
-Send a test event (simulates the IoT module):
+### Enviar un evento de prueba
+
+`scripts/simulate_event.py` se comporta como el módulo IoT. No tiene URL ni
+clave por defecto:
 
 ```bash
-python scripts/simulate_event.py --url http://localhost:8000 --key YOUR_IOT_API_KEY
+python scripts/simulate_event.py --url http://localhost:8000 --key TU_IOT_API_KEY
+# o con variables de entorno: BACKEND_URL e IOT_API_KEY
+python scripts/simulate_event.py --url http://localhost:8000 --key TU_IOT_API_KEY --tipo "Caída" --camara 1
 ```
 
 ## Endpoints
