@@ -18,7 +18,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "safevision"]
+known-first-party = ["safevision"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]

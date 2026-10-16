@@ -1,7 +1,8 @@
 """Shared test configuration.
 
-Fictitious environment values are forced before any application module is
-imported, so tests never pick up a local .env or reach a real database.
+Fictitious environment values are forced first, so a test that builds the
+application from the environment never picks up a local .env (load_dotenv
+does not override variables that are already set) or reaches a real database.
 """
 
 import os

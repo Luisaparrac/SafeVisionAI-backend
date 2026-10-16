@@ -4,9 +4,12 @@ The same tests run against every implementation of the API listed in
 ``BACKENDS``, all seeded with the same reference catalog (see
 ``tests.integration.postgres.insert_reference_rows``):
 
-* ``legacy``: the application in app/, currently in production;
-* ``hexagonal-memory``: the new application with in-memory adapters;
-* ``hexagonal-postgres``: the new application with the SQLAlchemy adapters.
+* ``hexagonal-memory``: the application with in-memory adapters;
+* ``hexagonal-postgres``: the application with the SQLAlchemy adapters, as in
+  production.
+
+Until phase 8 they also ran against the previous application (app/), so the
+expectations here are the behavior the frontend and the IoT module rely on.
 
 Backends that need PostgreSQL are skipped without TEST_DATABASE_URL.
 """
@@ -42,31 +45,6 @@ EVENT_KEYS = {
 }
 
 
-@contextmanager
-def legacy_client(request: pytest.FixtureRequest) -> Iterator[TestClient]:
-    """The application in app/, currently in production, on the test database."""
-    from app import services
-    from app.database import get_db
-    from app.main import app
-
-    engine = request.getfixturevalue("pg_seeded")
-    session_factory = make_session_factory(engine)
-
-    def test_db():
-        with session_factory() as db:
-            yield db
-
-    app.dependency_overrides[get_db] = test_db
-    with session_factory() as db:
-        services.rebuild_structures(db)
-    try:
-        # Not used as a context manager: its lifespan would open the production URL.
-        yield TestClient(app)
-    finally:
-        app.dependency_overrides.clear()
-
-
-# Same values the legacy application reads from the environment in tests/conftest.py.
 SETTINGS = Settings(
     database_url="postgresql://test:test@localhost/test",
     iot_api_key="test-key",
@@ -98,11 +76,10 @@ def hexagonal_postgres_client(request: pytest.FixtureRequest) -> Iterator[TestCl
 
 
 BACKENDS = {
-    "legacy": legacy_client,
     "hexagonal-memory": hexagonal_memory_client,
     "hexagonal-postgres": hexagonal_postgres_client,
 }
-NEEDS_DATABASE = {"legacy", "hexagonal-postgres"}
+NEEDS_DATABASE = {"hexagonal-postgres"}
 
 
 @pytest.fixture(
