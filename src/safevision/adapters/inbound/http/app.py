@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from safevision.adapters.inbound.http.container import Container
+from safevision.adapters.inbound.http.errors import install_error_handlers
 from safevision.adapters.inbound.http.routers import health
 
 DESCRIPTION = (
@@ -40,5 +41,6 @@ def create_app(container: Container) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    install_error_handlers(app)
     app.include_router(health.router)
     return app

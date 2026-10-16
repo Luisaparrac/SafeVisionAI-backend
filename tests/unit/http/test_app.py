@@ -32,3 +32,15 @@ def test_startup_rebuilds_the_board_from_the_database(settings, uow, clock):
     assert container.get_metrics.execute().pending == 0
     with TestClient(create_app(container)):
         assert container.get_metrics.execute().pending == 1
+
+
+def test_domain_errors_are_translated(container):
+    app = create_app(container)
+
+    @app.get("/prueba-error")
+    def fail() -> None:
+        container.get_event.execute(999)
+
+    response = TestClient(app).get("/prueba-error")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Evento 999 no existe"}
