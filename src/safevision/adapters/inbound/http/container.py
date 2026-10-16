@@ -6,6 +6,7 @@ read it from the application state, so they never create infrastructure.
 
 from dataclasses import dataclass, field
 
+from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 from safevision.application.ports.readiness import ReadinessProbe
 from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
@@ -30,6 +31,7 @@ class Container:
     iot_api_key: str = field(repr=False)
     cors_origins: tuple[str, ...]
     readiness: ReadinessProbe
+    alert_broadcaster: AlertBroadcaster
 
     rebuild_alert_board: RebuildAlertBoard
     register_event: RegisterEvent

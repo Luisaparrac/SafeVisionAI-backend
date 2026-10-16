@@ -12,6 +12,7 @@ from safevision.adapters.inbound.http.logging_setup import AccessLogMiddleware, 
 from safevision.adapters.inbound.http.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from safevision.adapters.inbound.http.routers import alertas, camaras, catalogos, eventos, health
 from safevision.adapters.inbound.http.routers.eventos import DUPLICATE_HEADER
+from safevision.adapters.inbound.http.websocket import router as websocket_router
 
 DESCRIPTION = (
     "API de SafeVision AI: recibe las detecciones del módulo IoT y sirve al panel "
@@ -58,6 +59,7 @@ def create_app(container: Container) -> FastAPI:
     app.include_router(alertas.router)
     app.include_router(catalogos.router)
     app.include_router(camaras.router)
+    app.include_router(websocket_router)
     return app
 
 

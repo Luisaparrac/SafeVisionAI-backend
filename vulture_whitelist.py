@@ -8,6 +8,7 @@ root
 ready
 recent_events
 pending_alerts
+alerts_feed
 
 # Pydantic reads these class attributes to build and serialize the models.
 model_config

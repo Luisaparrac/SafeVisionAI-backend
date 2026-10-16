@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from safevision.adapters.inbound.http.container import Container
+from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 from safevision.adapters.outbound.persistence.database import make_engine, make_session_factory
 from safevision.adapters.outbound.persistence.readiness import DatabaseReadinessProbe
 from safevision.adapters.outbound.persistence.unit_of_work import SqlAlchemyUnitOfWork
@@ -49,14 +50,16 @@ def build_container(
     presenter = EventPresenter(settings.tzinfo)
     board = AlertBoard(settings.history_capacity)
     deduplicator = EventDeduplicator(timedelta(seconds=settings.dedup_window_seconds), clock.now)
+    broadcaster = AlertBroadcaster()
     return Container(
         iot_api_key=settings.iot_api_key,
         cors_origins=settings.frontend_origins,
         readiness=readiness or AlwaysReady(),
+        alert_broadcaster=broadcaster,
         rebuild_alert_board=RebuildAlertBoard(uow, board, presenter),
-        register_event=RegisterEvent(uow, clock, board, deduplicator, presenter),
-        review_event=ReviewEvent(uow, clock, board, presenter),
-        mark_false_alarm=MarkFalseAlarm(uow, clock, board, presenter),
+        register_event=RegisterEvent(uow, clock, board, deduplicator, presenter, broadcaster),
+        review_event=ReviewEvent(uow, clock, board, presenter, broadcaster),
+        mark_false_alarm=MarkFalseAlarm(uow, clock, board, presenter, broadcaster),
         get_event=GetEvent(uow, presenter),
         list_events=ListEvents(uow, presenter),
         get_recent_events=GetRecentEvents(board),
