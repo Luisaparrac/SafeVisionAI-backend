@@ -9,6 +9,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
 
 class ConfigurationError(RuntimeError):
     """An environment variable is missing or has an invalid value."""
@@ -29,6 +31,7 @@ class Settings:
     timezone: str = "America/Bogota"
     history_capacity: int = 100
     dedup_window_seconds: float = 60.0
+    log_level: str = "INFO"
 
     def __post_init__(self) -> None:
         for name in ("database_url", "iot_api_key"):
@@ -42,6 +45,8 @@ class Settings:
             raise ConfigurationError("HISTORY_CAPACITY debe ser mayor que cero")
         if self.dedup_window_seconds < 0:
             raise ConfigurationError("DEDUP_WINDOW_SECONDS no puede ser negativa")
+        if self.log_level not in LOG_LEVELS:
+            raise ConfigurationError(f"LOG_LEVEL debe ser uno de {', '.join(LOG_LEVELS)}")
 
     @property
     def tzinfo(self) -> ZoneInfo:
@@ -72,6 +77,7 @@ class Settings:
             timezone=text("TIMEZONE") or defaults["timezone"].default,
             history_capacity=number("HISTORY_CAPACITY", int),
             dedup_window_seconds=number("DEDUP_WINDOW_SECONDS", float),
+            log_level=text("LOG_LEVEL").upper() or defaults["log_level"].default,
         )
 
 

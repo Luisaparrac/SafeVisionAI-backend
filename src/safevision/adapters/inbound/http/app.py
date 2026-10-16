@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.errors import install_error_handlers
+from safevision.adapters.inbound.http.logging_setup import AccessLogMiddleware, configure_logging
 from safevision.adapters.inbound.http.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from safevision.adapters.inbound.http.routers import alertas, camaras, catalogos, eventos, health
 from safevision.adapters.inbound.http.routers.eventos import DUPLICATE_HEADER
@@ -41,6 +42,7 @@ def create_app(container: Container) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.container = container
+    app.add_middleware(AccessLogMiddleware)  # inside RequestIdMiddleware: sees the id
     app.add_middleware(RequestIdMiddleware)
     # Added last, so it is the outermost middleware and also answers preflight requests.
     app.add_middleware(
@@ -71,7 +73,9 @@ def create_app_from_env() -> FastAPI:
     from safevision.config.settings import Settings
 
     load_dotenv()  # local runs; on the hosting platform the variables come from its dashboard
-    return create_app(build_production_container(Settings.from_env()))
+    settings = Settings.from_env()
+    configure_logging(settings.log_level)
+    return create_app(build_production_container(settings))
 
 
 def __getattr__(name: str) -> FastAPI:
