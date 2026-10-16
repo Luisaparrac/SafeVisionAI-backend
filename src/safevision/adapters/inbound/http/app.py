@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.errors import install_error_handlers
-from safevision.adapters.inbound.http.routers import camaras, catalogos, eventos, health
+from safevision.adapters.inbound.http.routers import alertas, camaras, catalogos, eventos, health
 from safevision.adapters.inbound.http.routers.eventos import DUPLICATE_HEADER
 
 DESCRIPTION = (
@@ -19,6 +19,7 @@ DESCRIPTION = (
 TAGS = [
     {"name": "salud", "description": "Información del servicio y estado."},
     {"name": "eventos", "description": "Detecciones del módulo IoT y su revisión."},
+    {"name": "alertas", "description": "Alertas pendientes por prioridad y métricas del panel."},
     {"name": "catálogos", "description": "Tipos de evento, ubicaciones, zonas y sujetos."},
     {"name": "cámaras", "description": "Cámaras y estado reportado por el módulo IoT."},
 ]
@@ -49,6 +50,7 @@ def create_app(container: Container) -> FastAPI:
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(eventos.router)
+    app.include_router(alertas.router)
     app.include_router(catalogos.router)
     app.include_router(camaras.router)
     return app
