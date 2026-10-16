@@ -1,4 +1,4 @@
-"""The local stack builds the production image against a database like production's."""
+"""Repository configuration files: local stack and dependency updates."""
 
 from pathlib import Path
 
@@ -47,3 +47,10 @@ def test_example_credentials_are_development_markers():
 def test_real_compose_values_stay_out_of_git():
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert ".env.compose" in ignored
+
+
+def test_dependabot_watches_python_packages_and_actions():
+    config = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))
+    ecosystems = {update["package-ecosystem"] for update in config["updates"]}
+    assert ecosystems == {"pip", "github-actions"}
+    assert all(update["directory"] == "/" for update in config["updates"])
