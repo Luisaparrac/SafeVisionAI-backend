@@ -33,6 +33,10 @@ def test_schema_parser_reads_every_table():
     assert len(schema_columns()) == 8
 
 
+def test_every_table_of_the_schema_is_mapped():
+    assert set(MAPPED) == set(schema_columns())
+
+
 @pytest.mark.parametrize("table", sorted(MAPPED))
 def test_mapped_columns_match_the_schema(table):
     mapped = {column.name for column in MAPPED[table].__table__.columns}
@@ -45,14 +49,15 @@ def test_primary_key_is_the_identity_column(table):
     assert keys == [f"{table.removesuffix('s')}_id"]
 
 
-def test_catalog_tables_are_mapped():
-    assert {"users", "locations", "subjects", "event_types"} <= set(MAPPED)
-
-
-def test_camera_tables_are_mapped():
-    assert {"cameras", "zones"} <= set(MAPPED)
-
-
 def test_camera_ip_and_zone_coordinates_use_postgres_types():
     assert orm.CameraRow.__table__.c.ip_address.type.__visit_name__ == "INET"
     assert orm.ZoneRow.__table__.c.coordinates.type.__visit_name__ == "JSONB"
+
+
+def test_instants_are_timezone_aware():
+    for column in (
+        orm.EventRow.__table__.c.occurred_at,
+        orm.AlertRow.__table__.c.created_at,
+        orm.AlertRow.__table__.c.attended_at,
+    ):
+        assert column.type.timezone is True
