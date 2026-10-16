@@ -71,6 +71,8 @@ class InMemoryEventRepository(InMemoryStore[Event]):
     def _matches(event: Event, criteria: EventFilter) -> bool:
         if criteria.statuses is not None and event.status not in criteria.statuses:
             return False
+        if criteria.camera_ids is not None and event.camera_id not in criteria.camera_ids:
+            return False
         return criteria.event_type_ids is None or event.event_type_id in criteria.event_type_ids
 
 

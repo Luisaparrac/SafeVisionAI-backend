@@ -71,3 +71,9 @@ def test_text_search(list_events, q, expected):
 
 def test_blank_text_matches_everything(list_events):
     assert len(list_events.execute(q="   ")) == 5
+
+
+def test_filter_by_camera(list_events):
+    assert ids(list_events.execute(camera_id=2)) == [3]
+    assert ids(list_events.execute(camera_id=1, status="Pendiente")) == [4, 1]
+    assert list_events.execute(camera_id=99) == []

@@ -23,6 +23,7 @@ class EventFilter:
 
     statuses: tuple[EventStatus, ...] | None = None
     event_type_ids: tuple[int, ...] | None = None
+    camera_ids: tuple[int, ...] | None = None
 
 
 @runtime_checkable

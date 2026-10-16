@@ -14,16 +14,22 @@ class ListEvents:
         self._presenter = presenter
 
     def execute(
-        self, q: str | None = None, priority: str | None = None, status: str | None = None
+        self,
+        q: str | None = None,
+        priority: str | None = None,
+        status: str | None = None,
+        camera_id: int | None = None,
     ) -> list[EventView]:
         """Newest first. Unknown priority or status labels are ignored, as in the panel.
 
         ``q`` matches, case-insensitively, the id, type, subject or location shown.
+        ``camera_id`` keeps only the events of that camera.
         """
         with self._uow as uow:
             criteria = EventFilter(
                 statuses=self._statuses(status),
                 event_type_ids=self._event_type_ids(uow, priority),
+                camera_ids=None if camera_id is None else (camera_id,),
             )
             views = self._presenter.present_many(uow, uow.events.find(criteria))
         if q:

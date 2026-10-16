@@ -67,3 +67,11 @@ def test_find_and_count_by_status_and_type(repo):
     assert repo.count(EventFilter(statuses=(EventStatus.RESOLVED,), event_type_ids=(1,))) == 0
     assert repo.count(EventFilter(event_type_ids=())) == 0
     assert repo.count(ALL) == 3
+
+
+def test_find_and_count_by_camera(repo):
+    repo.add(new_event(camera_id=1))
+    repo.add(new_event(camera_id=2))
+    repo.add(new_event(camera_id=3))
+    assert [e.id for e in repo.find(EventFilter(camera_ids=(1, 3)))] == [3, 1]
+    assert repo.count(EventFilter(camera_ids=(2,))) == 1

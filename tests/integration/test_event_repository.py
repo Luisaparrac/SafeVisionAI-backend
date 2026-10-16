@@ -88,3 +88,12 @@ def test_empty_type_list_matches_nothing(repo):
     repo.add(new_event())
     assert repo.find(EventFilter(event_type_ids=())) == []
     assert repo.count(EventFilter(event_type_ids=())) == 0
+
+
+def test_find_and_count_by_camera(repo):
+    repo.add(new_event(camera_id=1))
+    repo.add(new_event(camera_id=2, minutes=1))
+    repo.add(new_event(camera_id=1, minutes=2))
+    assert [e.id for e in repo.find(EventFilter(camera_ids=(1,)))] == [3, 1]
+    assert repo.count(EventFilter(camera_ids=(2,))) == 1
+    assert repo.find(EventFilter(camera_ids=())) == []

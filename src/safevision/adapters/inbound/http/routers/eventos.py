@@ -18,10 +18,13 @@ def list_events(
     q: str | None = None,
     prioridad: str | None = Query(None, description="Alto, Medio o Bajo"),
     estado: str | None = Query(None, description="Pendiente o Revisado"),
+    camara_id: int | None = Query(None, description="Solo eventos de esta cámara"),
     container: Container = Depends(get_container),
 ) -> list[EventOut]:
     """Newest first. ``q`` searches the id, type, subject and location."""
-    views = container.list_events.execute(q=q, priority=prioridad, status=estado)
+    views = container.list_events.execute(
+        q=q, priority=prioridad, status=estado, camera_id=camara_id
+    )
     return [EventOut.from_view(view) for view in views]
 
 

@@ -95,3 +95,15 @@ def test_oversized_description_is_rejected_before_storing(client, uow):
     response = client.post("/api/eventos", json=body, headers=KEY)
     assert response.status_code == 422
     assert uow.events.all() == []
+
+
+def test_filter_by_camera(client, clock):
+    sala = post(client, camera_id=1, event_type_id=3)
+    clock.advance(1)
+    patio = post(client, camera_id=2, event_type_id=3)
+    assert client.get("/api/eventos", params={"camara_id": 2}).json() == [patio]
+    assert client.get("/api/eventos", params={"camara_id": 1}).json() == [sala]
+    assert client.get("/api/eventos", params={"camara_id": 99}).json() == []
+    combined = client.get("/api/eventos", params={"camara_id": 1, "prioridad": "Alto"})
+    assert combined.json() == []
+    assert client.get("/api/eventos", params={"camara_id": "sala"}).status_code == 422
