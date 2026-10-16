@@ -43,6 +43,8 @@ jobs:
         run: ruff check .
       - name: Format
         run: ruff format --check .
+      - name: Dead code
+        run: vulture
       - name: Tests (unit, contract and integration)
         run: pytest
       - name: Production-only environment (what the platform installs)

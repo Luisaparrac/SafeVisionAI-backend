@@ -8,7 +8,7 @@ requires-python = ">=3.12"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = [".venv", "venv"]
+extend-exclude = [".venv", "venv", "vulture_whitelist.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -28,3 +28,8 @@ markers = [
     "integration: requires a PostgreSQL test database (TEST_DATABASE_URL)",
     "smoke: starts the server with the start command of render.yaml (run with -m smoke)",
 ]
+
+[tool.vulture]
+# Production code only: code used just by tests is dead too.
+paths = ["src", "scripts", "vulture_whitelist.py"]
+min_confidence = 0
