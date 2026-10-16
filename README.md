@@ -136,6 +136,35 @@ marcadores.
 Las claves nunca aparecen en los registros: un filtro oculta credenciales de
 URLs y valores de campos como `password` o `api_key`.
 
+## Despliegue en Render
+
+El servicio se define en `render.yaml` (plan gratuito, Python 3.12) y Render lo
+despliega **sin Docker**:
+
+| Paso | Valor |
+|---|---|
+| Construcción | `pip install -r requirements.txt` (solo dependencias de producción) |
+| Arranque | `uvicorn safevision.adapters.inbound.http.app:app --app-dir src --host 0.0.0.0 --port $PORT` |
+| Chequeo de salud | `GET /health` (no consulta la base, para que un corte de la base no reinicie el servicio) |
+
+- **Cada push a `main` redespliega producción.** El trabajo se hace en ramas y
+  entra a `main` por pull request con "Create a merge commit" (ver
+  [CONTRIBUTING.md](CONTRIBUTING.md)).
+- Variables: `DATABASE_URL` se define a mano en el panel de Render
+  (`sync: false`); `IOT_API_KEY` la genera Render y se comparte con el equipo
+  IoT; `FRONTEND_ORIGINS` y `TIMEZONE` completan la configuración. Ninguna se
+  escribe en el repositorio.
+- Las IP de salida del servicio (en Render: *Connect → Outbound*) deben estar
+  permitidas en el firewall de la base.
+- `GET /health/ready` responde 503 si la base no contesta; sirve para
+  monitoreo externo.
+- En el plan gratuito el servicio se duerme tras 15 minutos sin tráfico y tarda
+  cerca de un minuto en despertar. El panel debe reconectar el WebSocket
+  cuando eso pasa.
+- El arranque se valida en CI: el paso de humo
+  arranca el comando de `render.yaml` en un entorno con solo
+  `requirements.txt`.
+
 ## Endpoints
 
 | Method | Path | Used by |
@@ -176,12 +205,3 @@ The database sets `occurred_at`; an alert with `level = severity_level` is creat
 
 Camera status: `PATCH /api/camaras/{id}/estado` with `{"status": "active"}`
 (active, inactive, disconnected, maintenance).
-
-## Deploy on Render
-
-1. Push to GitHub; Render redeploys automatically.
-2. In the service's environment variables, set `DATABASE_URL` to the database URL.
-3. Add the service's outbound IPs (Connect → Outbound) as database firewall rules.
-
-Free plan note: the service sleeps after 15 minutes without traffic and takes about a
-minute to wake up.
