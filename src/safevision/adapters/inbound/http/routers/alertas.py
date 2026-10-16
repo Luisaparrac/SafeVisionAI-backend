@@ -17,6 +17,16 @@ def pending_alerts(
     return [AlertOut.from_view(view) for view in container.get_pending_alerts.execute(limit)]
 
 
+@router.patch(
+    "/alertas/{alert_id}/vista",
+    response_model=AlertOut,
+    responses={409: {"description": "La alerta ya fue atendida o descartada"}},
+)
+def mark_alert_seen(alert_id: int, container: Container = Depends(get_container)) -> AlertOut:
+    """Records that someone saw the alert; it stays pending until its event is closed."""
+    return AlertOut.from_view(container.mark_alert_seen.execute(alert_id))
+
+
 @router.get("/metricas", response_model=MetricsOut)
 def metrics(container: Container = Depends(get_container)) -> MetricsOut:
     """Total events, pending alerts and high-priority events."""

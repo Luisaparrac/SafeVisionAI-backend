@@ -17,6 +17,7 @@ from safevision.application.use_cases.list_events import ListEvents
 from safevision.application.use_cases.list_locations import ListLocations
 from safevision.application.use_cases.list_subjects import ListSubjects
 from safevision.application.use_cases.list_zones import ListZones
+from safevision.application.use_cases.mark_alert_seen import MarkAlertSeen
 from safevision.application.use_cases.mark_false_alarm import MarkFalseAlarm
 from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoard
 from safevision.application.use_cases.register_event import RegisterEvent
@@ -38,6 +39,7 @@ class Container:
     list_events: ListEvents
     get_recent_events: GetRecentEvents
     get_pending_alerts: GetPendingAlerts
+    mark_alert_seen: MarkAlertSeen
     get_metrics: GetMetrics
     list_event_types: ListEventTypes
     list_locations: ListLocations

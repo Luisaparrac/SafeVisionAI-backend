@@ -23,6 +23,7 @@ from safevision.application.use_cases.list_events import ListEvents
 from safevision.application.use_cases.list_locations import ListLocations
 from safevision.application.use_cases.list_subjects import ListSubjects
 from safevision.application.use_cases.list_zones import ListZones
+from safevision.application.use_cases.mark_alert_seen import MarkAlertSeen
 from safevision.application.use_cases.mark_false_alarm import MarkFalseAlarm
 from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoard
 from safevision.application.use_cases.register_event import RegisterEvent
@@ -60,6 +61,7 @@ def build_container(
         list_events=ListEvents(uow, presenter),
         get_recent_events=GetRecentEvents(board),
         get_pending_alerts=GetPendingAlerts(uow, board, presenter),
+        mark_alert_seen=MarkAlertSeen(uow, presenter),
         get_metrics=GetMetrics(uow, board),
         list_event_types=ListEventTypes(uow),
         list_locations=ListLocations(uow),
