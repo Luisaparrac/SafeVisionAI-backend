@@ -8,7 +8,8 @@ from safevision.application.ports.repositories import EventFilter
 from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.application.presenter import EventPresenter
 from safevision.domain.errors import ValidationError
-from safevision.domain.model.values import Priority, ReviewLabel
+from safevision.domain.model.identity import require_id
+from safevision.domain.model.values import EventStatus, Priority, ReviewLabel
 
 
 class ListEvents:
@@ -63,7 +64,7 @@ class ListEvents:
         return views[offset:] if limit is None else views[offset : offset + limit]
 
     @staticmethod
-    def _statuses(label: str | None):
+    def _statuses(label: str | None) -> tuple[EventStatus, ...] | None:
         if label is None:
             return None
         try:
@@ -79,4 +80,5 @@ class ListEvents:
             levels = Priority.parse(label).severity_levels
         except ValidationError:
             return None
-        return tuple(t.id for t in uow.event_types.list_all() if t.severity.level in levels)
+        types = uow.event_types.list_all()
+        return tuple(require_id(t.id) for t in types if t.severity.level in levels)

@@ -6,6 +6,7 @@ from safevision.application.date_range import local_day_range
 from safevision.application.dto import CameraCount, EventTypeCount
 from safevision.application.ports.repositories import EventFilter
 from safevision.application.ports.unit_of_work import UnitOfWork
+from safevision.domain.model.identity import require_id
 
 
 class _Statistics:
@@ -27,7 +28,12 @@ class GetEventTypeStatistics(_Statistics):
         with self._uow as uow:
             counts = uow.events.count_by_event_type(criteria)
             types = uow.event_types.list_all()
-        rows = [EventTypeCount(t.id, t.name, t.priority.value, counts.get(t.id, 0)) for t in types]
+        rows = [
+            EventTypeCount(
+                require_id(t.id), t.name, t.priority.value, counts.get(require_id(t.id), 0)
+            )
+            for t in types
+        ]
         return sorted(rows, key=lambda row: (-row.total, row.name))
 
 
@@ -40,5 +46,7 @@ class GetCameraStatistics(_Statistics):
         with self._uow as uow:
             counts = uow.events.count_by_camera(criteria)
             cameras = uow.cameras.list_all()
-        rows = [CameraCount(c.id, c.name, counts.get(c.id, 0)) for c in cameras]
+        rows = [
+            CameraCount(require_id(c.id), c.name, counts.get(require_id(c.id), 0)) for c in cameras
+        ]
         return sorted(rows, key=lambda row: (-row.total, row.camera_id))

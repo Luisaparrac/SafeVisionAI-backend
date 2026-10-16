@@ -45,6 +45,8 @@ jobs:
         run: ruff format --check .
       - name: Dead code
         run: vulture
+      - name: Types (domain and application)
+        run: mypy
       - name: Tests (unit, contract and integration) with coverage
         run: pytest --cov --cov-report=term --cov-report=xml
       - name: Coverage report

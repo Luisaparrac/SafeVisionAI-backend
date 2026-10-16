@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from safevision.domain.errors import ValidationError
 from safevision.domain.model._checks import aware_datetime, optional_id, optional_text, required_id
@@ -49,7 +50,7 @@ class Event:
         event_type: EventType,
         occurred_at: datetime,
         zone: Zone | None = None,
-        **details,
+        **details: Any,
     ) -> "Event":
         """Creates a new pending event; the zone, if any, must belong to the camera."""
         if camera.id is None or event_type.id is None:

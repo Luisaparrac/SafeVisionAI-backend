@@ -13,6 +13,7 @@ from safevision.domain.errors import NotFoundError, ValidationError
 from safevision.domain.model.alert import Alert
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
+from safevision.domain.model.identity import require_id
 from safevision.domain.structures.alert_priority_queue import AlertEntry
 
 
@@ -71,7 +72,7 @@ class RegisterEvent:
                     )
             event_type = self._event_type(uow, command)
 
-            key = (command.camera_id, event_type.id, command.subject_id)
+            key = (command.camera_id, require_id(event_type.id), command.subject_id)
             duplicate_id = self._deduplicator.find_recent(key)
             duplicate = None if duplicate_id is None else uow.events.get(duplicate_id)
             if duplicate is not None:
@@ -95,11 +96,12 @@ class RegisterEvent:
             uow.commit()
 
         # Memory is updated only after the commit succeeded.
-        self._board.add(AlertEntry(event.id, event_type.severity, event.occurred_at), view)
-        self._deduplicator.remember(key, event.id)
+        event_id = require_id(event.id)
+        self._board.add(AlertEntry(event_id, event_type.severity, event.occurred_at), view)
+        self._deduplicator.remember(key, event_id)
         if self._notifier is not None:
             alert_view = AlertView(
-                alert_id=alert.id,
+                alert_id=require_id(alert.id),
                 level=alert.level.priority.value,
                 status=alert.status.label,
                 event=view,
