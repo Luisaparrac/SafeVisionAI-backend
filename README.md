@@ -247,3 +247,50 @@ Al conectarse a `/ws/alertas` el panel recibe mensajes JSON:
   debe ignorar los tipos que no conozca y reconectarse si la conexión se cae.
 - No pide clave, igual que las demás rutas de lectura del panel
   ([ADR 0006](docs/adr/0006-websocket-sin-autenticacion.md)).
+
+## Calidad
+
+| Herramienta | Qué verifica | Cómo correrla |
+|---|---|---|
+| pytest | Pruebas unitarias, de arquitectura, de contrato e integración | `pytest` |
+| ruff | Estilo (E, F, I, UP, B, SIM) y formato | `ruff check .` y `ruff format --check .` |
+| mypy | Tipos de `domain` y `application` en modo estricto | `mypy` |
+| vulture | Código muerto en `src` y `scripts` (las pruebas no cuentan como uso) | `vulture` |
+| pytest-cov | Cobertura de ramas; el CI exige al menos 95 % | `pytest --cov` |
+
+**Tipos de prueba** (`tests/`):
+
+- `unit/`: dominio, estructuras, casos de uso con repositorios en memoria y
+  adaptador HTTP con `TestClient`. No usan base de datos.
+- `architecture/`: el dominio y la aplicación no importan frameworks ni capas
+  exteriores, y el código no ejecuta DDL.
+- `contract/`: las mismas peticiones contra la app con adaptadores en memoria
+  y con PostgreSQL; fijan el contrato que usan el panel y el módulo IoT.
+- `integration/`: repositorios y casos de uso sobre PostgreSQL. Usan **solo**
+  `TEST_DATABASE_URL`, que debe apuntar a `localhost` y a una base cuyo nombre
+  termine en `_test` (si no, fallan sin ejecutar nada); sin la variable se
+  omiten. Recrean las tablas de `tests/integration/schema.sql`.
+- `smoke/`: arranca uvicorn con el comando de `render.yaml` y prueba las rutas
+  principales y el WebSocket (`pytest -m smoke`).
+
+**Integración continua** (`.github/workflows/ci.yml`, en cada push y pull
+request):
+
+1. Job `test`, con Python 3.12 y un PostgreSQL 16 desechable: ruff, vulture,
+   mypy, pytest con cobertura (se publica `coverage.xml`) y la prueba de humo
+   desde un entorno que solo instala `requirements.txt`.
+2. Job `docker`: construye la imagen, levanta `docker compose` y comprueba
+   `/health`, `/health/ready`, los datos de ejemplo y que el servidor no corre
+   como root.
+
+**pre-commit**: `.pre-commit-config.yaml` corre ruff, vulture, mypy y pytest
+antes de cada commit con las herramientas de `requirements-dev.txt`. Se activa
+con `pre-commit install` dentro del entorno virtual.
+
+## Documentación
+
+- [docs/arquitectura.md](docs/arquitectura.md): capas, puertos, adaptadores y flujo de una detección.
+- [docs/estructuras.md](docs/estructuras.md): estructuras de datos, complejidades y uso.
+- [docs/api.md](docs/api.md): referencia completa de la API.
+- [docs/adr/](docs/adr/): decisiones de arquitectura.
+- [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md) y [SECURITY.md](SECURITY.md).
