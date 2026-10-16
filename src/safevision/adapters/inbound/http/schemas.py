@@ -72,6 +72,24 @@ MAX_EVIDENCE_URL_LENGTH = 2048
 class EventIn(BaseModel):
     """What the IoT module sends when it detects something."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "camera_id": 1,
+                    "event_type": "Caída",
+                    "subject_id": 1,
+                    "zone_id": 1,
+                    "detected_class": "person",
+                    "confidence": 0.92,
+                    "evidence_url": "https://example.com/evidencias/0001.jpg",
+                    "description": "Persona en el piso junto a la escalera",
+                },
+                {"camera_id": 2, "event_type_id": 3, "detected_class": "dog"},
+            ]
+        }
+    )
+
     camera_id: int
     event_type_id: int | None = None
     event_type: str | None = Field(None, description="Nombre del tipo, alternativa a event_type_id")
@@ -87,6 +105,8 @@ class EventIn(BaseModel):
 
 
 class CameraStatusIn(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"status": "disconnected"}]})
+
     status: Literal["active", "inactive", "disconnected", "maintenance"]
 
 
