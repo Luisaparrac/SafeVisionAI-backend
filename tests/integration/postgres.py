@@ -30,9 +30,10 @@ TABLES = ("alerts", "events", "event_types", "subjects", "zones", "cameras", "lo
 SQUARE = [[0, 0], [1, 0], [1, 1], [0, 1]]
 
 
-def schema_statements() -> list[str]:
+def sql_statements(path: Path) -> list[str]:
+    """Statements of a SQL file (they must not contain ";" inside literals)."""
     return [
-        statement.strip() for statement in SCHEMA.read_text("utf-8").split(";") if statement.strip()
+        statement.strip() for statement in path.read_text("utf-8").split(";") if statement.strip()
     ]
 
 
@@ -51,7 +52,7 @@ def pg_engine() -> Engine:
     engine = make_engine(url)
     with engine.begin() as connection:
         connection.execute(text(f"DROP TABLE IF EXISTS {', '.join(TABLES)} CASCADE"))
-        for statement in schema_statements():
+        for statement in sql_statements(SCHEMA):
             connection.exec_driver_sql(statement)
     yield engine
     engine.dispose()
