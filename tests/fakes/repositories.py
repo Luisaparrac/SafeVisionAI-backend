@@ -5,6 +5,7 @@ Entities are copied on the way in and out, so a use case that forgets to call
 """
 
 import copy
+from collections import Counter
 
 from safevision.application.ports.repositories import EventFilter
 from safevision.domain.errors import NotFoundError
@@ -66,6 +67,12 @@ class InMemoryEventRepository(InMemoryStore[Event]):
 
     def count(self, criteria: EventFilter) -> int:
         return len(self.find(criteria))
+
+    def count_by_event_type(self, criteria: EventFilter) -> dict[int, int]:
+        return dict(Counter(event.event_type_id for event in self.find(criteria)))
+
+    def count_by_camera(self, criteria: EventFilter) -> dict[int, int]:
+        return dict(Counter(event.camera_id for event in self.find(criteria)))
 
     @staticmethod
     def _matches(event: Event, criteria: EventFilter) -> bool:

@@ -12,6 +12,10 @@ from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
+from safevision.application.use_cases.get_statistics import (
+    GetCameraStatistics,
+    GetEventTypeStatistics,
+)
 from safevision.application.use_cases.list_cameras import ListCameras
 from safevision.application.use_cases.list_event_types import ListEventTypes
 from safevision.application.use_cases.list_events import ListEvents
@@ -43,6 +47,8 @@ class Container:
     get_pending_alerts: GetPendingAlerts
     mark_alert_seen: MarkAlertSeen
     get_metrics: GetMetrics
+    event_type_statistics: GetEventTypeStatistics
+    camera_statistics: GetCameraStatistics
     list_event_types: ListEventTypes
     list_locations: ListLocations
     list_cameras: ListCameras

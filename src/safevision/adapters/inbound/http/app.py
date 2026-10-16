@@ -10,7 +10,14 @@ from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.errors import install_error_handlers
 from safevision.adapters.inbound.http.logging_setup import AccessLogMiddleware, configure_logging
 from safevision.adapters.inbound.http.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
-from safevision.adapters.inbound.http.routers import alertas, camaras, catalogos, eventos, health
+from safevision.adapters.inbound.http.routers import (
+    alertas,
+    camaras,
+    catalogos,
+    estadisticas,
+    eventos,
+    health,
+)
 from safevision.adapters.inbound.http.routers.eventos import DUPLICATE_HEADER
 from safevision.adapters.inbound.http.websocket import router as websocket_router
 
@@ -23,6 +30,7 @@ TAGS = [
     {"name": "salud", "description": "Información del servicio y estado."},
     {"name": "eventos", "description": "Detecciones del módulo IoT y su revisión."},
     {"name": "alertas", "description": "Alertas pendientes por prioridad y métricas del panel."},
+    {"name": "estadísticas", "description": "Conteos de eventos por tipo y por cámara."},
     {"name": "catálogos", "description": "Tipos de evento, ubicaciones, zonas y sujetos."},
     {"name": "cámaras", "description": "Cámaras y estado reportado por el módulo IoT."},
 ]
@@ -57,6 +65,7 @@ def create_app(container: Container) -> FastAPI:
     app.include_router(health.router)
     app.include_router(eventos.router)
     app.include_router(alertas.router)
+    app.include_router(estadisticas.router)
     app.include_router(catalogos.router)
     app.include_router(camaras.router)
     app.include_router(websocket_router)

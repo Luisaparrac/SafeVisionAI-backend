@@ -18,6 +18,10 @@ from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
+from safevision.application.use_cases.get_statistics import (
+    GetCameraStatistics,
+    GetEventTypeStatistics,
+)
 from safevision.application.use_cases.list_cameras import ListCameras
 from safevision.application.use_cases.list_event_types import ListEventTypes
 from safevision.application.use_cases.list_events import ListEvents
@@ -66,6 +70,8 @@ def build_container(
         get_pending_alerts=GetPendingAlerts(uow, board, presenter),
         mark_alert_seen=MarkAlertSeen(uow, presenter),
         get_metrics=GetMetrics(uow, board),
+        event_type_statistics=GetEventTypeStatistics(uow, settings.tzinfo),
+        camera_statistics=GetCameraStatistics(uow, settings.tzinfo),
         list_event_types=ListEventTypes(uow),
         list_locations=ListLocations(uow),
         list_cameras=ListCameras(uow),

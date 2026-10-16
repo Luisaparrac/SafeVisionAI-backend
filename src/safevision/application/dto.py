@@ -50,3 +50,18 @@ class AlertNotification:
     kind: str
     event: EventView
     alert: AlertView | None = None
+
+
+@dataclass(frozen=True)
+class EventTypeCount:
+    event_type_id: int
+    name: str
+    priority: str  # Alto / Medio / Bajo
+    total: int
+
+
+@dataclass(frozen=True)
+class CameraCount:
+    camera_id: int
+    name: str
+    total: int

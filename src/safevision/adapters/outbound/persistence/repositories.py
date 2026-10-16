@@ -136,6 +136,17 @@ class SqlAlchemyEventRepository:
         statement = _filtered(select(func.count(EventRow.event_id)), criteria)
         return self._session.scalar(statement) or 0
 
+    def count_by_event_type(self, criteria: EventFilter) -> dict[int, int]:
+        return self._count_by(EventRow.event_type_id, criteria)
+
+    def count_by_camera(self, criteria: EventFilter) -> dict[int, int]:
+        return self._count_by(EventRow.camera_id, criteria)
+
+    def _count_by(self, column, criteria: EventFilter) -> dict[int, int]:
+        statement = _filtered(select(column, func.count(EventRow.event_id)), criteria)
+        rows = self._session.execute(statement.group_by(column))
+        return {key: total for key, total in rows}
+
 
 def _filtered[S: Select](statement: S, criteria: EventFilter) -> S:
     if criteria.statuses is not None:

@@ -54,6 +54,14 @@ class EventRepository(Protocol):
         """Number of matching events."""
         ...
 
+    def count_by_event_type(self, criteria: EventFilter) -> dict[int, int]:
+        """Matching events per event type id; types without events are left out."""
+        ...
+
+    def count_by_camera(self, criteria: EventFilter) -> dict[int, int]:
+        """Matching events per camera id; cameras without events are left out."""
+        ...
+
 
 @runtime_checkable
 class AlertRepository(Protocol):
