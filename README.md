@@ -165,22 +165,36 @@ despliega **sin Docker**:
   arranca el comando de `render.yaml` en un entorno con solo
   `requirements.txt`.
 
-## Endpoints
+## Contrato de la API
 
-| Method | Path | Used by |
+Resumen de las rutas; la referencia completa, con parámetros, respuestas y
+errores, está en [docs/api.md](docs/api.md) y en `/docs` (OpenAPI).
+
+| Método | Ruta | Uso |
 |---|---|---|
-| GET | `/health` | Render health check |
-| GET | `/api/eventos?q=&prioridad=&estado=` | Frontend (history table) |
-| GET | `/api/eventos/recientes?limit=` | Frontend (linked-list history) |
-| GET | `/api/eventos/{id}` | Frontend |
-| POST | `/api/eventos` (header `X-API-Key`) | IoT module |
-| PATCH | `/api/eventos/{id}/revisar` | Frontend (review button) |
-| GET | `/api/alertas/pendientes?limit=` | Frontend (priority-queue order) |
-| GET | `/api/metricas` | Frontend (metric cards) |
-| GET | `/api/tipos-evento`, `/api/ubicaciones`, `/api/camaras`, `/api/zonas`, `/api/sujetos` | Catalogs (read only) |
-| PATCH | `/api/camaras/{id}/estado` (header `X-API-Key`) | IoT module (camera status) |
+| GET | `/health` | Prueba de vida del hosting |
+| GET | `/health/ready` | Comprueba también la base (503 si no responde) |
+| GET | `/api/eventos?q=&prioridad=&estado=&camara_id=&desde=&hasta=&limit=&offset=` | Historial de eventos con filtros opcionales |
+| GET | `/api/eventos/recientes?limit=` | Historial reciente (lista doblemente enlazada) |
+| GET | `/api/eventos/{id}` | Detalle de un evento |
+| POST | `/api/eventos` (`X-API-Key`) | Módulo IoT: registrar una detección |
+| PATCH | `/api/eventos/{id}/revisar` | Panel: marcar como revisado |
+| PATCH | `/api/eventos/{id}/falsa-alarma` | Panel: marcar como falsa alarma |
+| GET | `/api/alertas/pendientes?limit=` | Alertas pendientes en orden de la cola de prioridad |
+| PATCH | `/api/alertas/{id}/vista` | Panel: alerta vista (sigue pendiente) |
+| GET | `/api/metricas` | Totales del panel |
+| GET | `/api/estadisticas/tipos?desde=&hasta=` | Eventos por tipo |
+| GET | `/api/estadisticas/camaras?desde=&hasta=` | Eventos por cámara |
+| GET | `/api/tipos-evento`, `/api/ubicaciones`, `/api/camaras`, `/api/zonas`, `/api/sujetos` | Catálogos de solo lectura |
+| PATCH | `/api/camaras/{id}/estado` (`X-API-Key`) | Módulo IoT: estado de una cámara |
+| WS | `/ws/alertas` | Alertas nuevas y eventos revisados en vivo |
 
-### IoT contract
+Los parámetros que no estaban en la primera versión (`camara_id`, `desde`,
+`hasta`, `limit`, `offset`) son opcionales: sin ellos la respuesta es la misma
+de siempre. Las pruebas de contrato (`tests/contract`) fijan las rutas, los
+códigos y la forma JSON de las que usan el panel y el módulo IoT.
+
+### Módulo IoT: registrar una detección
 
 ```http
 POST /api/eventos
@@ -191,17 +205,45 @@ Content-Type: application/json
   "camera_id": 1,
   "event_type": "Caída",
   "subject_id": null,
-  "zone_id": null,
+  "zone_id": 1,
   "detected_class": "person",
   "confidence": 0.93,
-  "evidence_url": null,
-  "description": "optional"
+  "evidence_url": "https://example.com/evidencias/0001.jpg",
+  "description": "opcional"
 }
 ```
 
-`event_type` (name, case-insensitive) or `event_type_id`. `detected_class` is one of
-person, dog, cat, other_animal. `confidence` is 0–1. `zone_id` must belong to the camera.
-The database sets `occurred_at`; an alert with `level = severity_level` is created too.
+- `event_type` (nombre, sin distinguir mayúsculas) o `event_type_id`.
+- `detected_class`: `person`, `dog`, `cat` u `other_animal`. `confidence`: 0 a 1.
+- `zone_id` debe pertenecer a la cámara. `description` admite hasta 2000
+  caracteres y `evidence_url` hasta 2048; el cuerpo completo, hasta 64 KiB.
+- Responde **201** con el evento (`id, type, subject, location, camera, date,
+  time, priority, status, description`) y crea su alerta con
+  `level = severidad del tipo`.
+- Una detección repetida (misma cámara, tipo y sujeto) dentro de
+  `DEDUP_WINDOW_SECONDS` responde **201 con el evento ya registrado** y el
+  encabezado `X-Duplicate: true`; no crea otra alerta.
+- Errores: 401 sin clave o con clave incorrecta, 404 si no existe la cámara,
+  el tipo, el sujeto o la zona, 422 si el cuerpo es inválido, 413 si es
+  demasiado grande.
 
-Camera status: `PATCH /api/camaras/{id}/estado` with `{"status": "active"}`
-(active, inactive, disconnected, maintenance).
+Estado de una cámara: `PATCH /api/camaras/{id}/estado` con
+`{"status": "disconnected"}` (`active`, `inactive`, `disconnected` o
+`maintenance`) y el mismo encabezado `X-API-Key`.
+
+### Panel: alertas en vivo por WebSocket
+
+Al conectarse a `/ws/alertas` el panel recibe mensajes JSON:
+
+```json
+{"tipo": "alerta_nueva", "alerta": {"id_alerta": 7, "nivel": "Alto", "estado": "Activa", "event": {"id": 7, "type": "Caída", "...": "..."}}}
+{"tipo": "evento_revisado", "evento": {"id": 7, "status": "Revisado", "...": "..."}}
+{"tipo": "ping"}
+```
+
+- `alerta` y `evento` tienen la misma forma que en `/api/alertas/pendientes` y
+  `/api/eventos/{id}`.
+- `ping` llega tras 25 s sin mensajes para mantener viva la conexión. El panel
+  debe ignorar los tipos que no conozca y reconectarse si la conexión se cae.
+- No pide clave, igual que las demás rutas de lectura del panel
+  ([ADR 0006](docs/adr/0006-websocket-sin-autenticacion.md)).
