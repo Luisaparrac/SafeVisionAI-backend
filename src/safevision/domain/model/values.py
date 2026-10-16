@@ -5,7 +5,6 @@ frontend displays.
 """
 
 import math
-import re
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -277,25 +276,3 @@ class ZonePolygon:
     def to_list(self) -> list[list[float]]:
         """The JSON shape stored in the database."""
         return [[x, y] for x, y in self.points]
-
-
-# Same pattern as the database constraint chk_users_email (case-insensitive match).
-_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", re.IGNORECASE)
-
-
-@dataclass(frozen=True)
-class Email:
-    """E-mail address of a panel user."""
-
-    value: str
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.value, str):
-            raise ValidationError("El correo debe ser texto")
-        value = self.value.strip()
-        if not _EMAIL_PATTERN.fullmatch(value):
-            raise ValidationError(f"Correo inválido: {value!r}")
-        object.__setattr__(self, "value", value)
-
-    def __str__(self) -> str:
-        return self.value
