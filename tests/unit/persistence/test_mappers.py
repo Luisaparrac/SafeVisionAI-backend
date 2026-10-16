@@ -1,11 +1,19 @@
 """ORM rows <-> domain entities, using transient rows (no database)."""
 
+import ipaddress
+
 import pytest
 
 from safevision.adapters.outbound.persistence import mappers
-from safevision.adapters.outbound.persistence.orm import EventTypeRow, LocationRow, SubjectRow
+from safevision.adapters.outbound.persistence.orm import (
+    CameraRow,
+    EventTypeRow,
+    LocationRow,
+    SubjectRow,
+    ZoneRow,
+)
 from safevision.domain.errors import ValidationError
-from safevision.domain.model.values import Priority, Severity, SubjectType
+from safevision.domain.model.values import CameraStatus, Priority, Severity, SubjectType
 
 
 def test_event_type_row_to_domain():
@@ -43,3 +51,62 @@ def test_subject_row_to_domain():
     assert subject.id == 7
     assert subject.subject_type is SubjectType.ELDERLY
     assert subject.description is None  # blank text is normalized by the domain
+
+
+def camera_row(**overrides) -> CameraRow:
+    values = {
+        "camera_id": 1,
+        "name": "Sala",
+        "ip_address": "192.0.2.10",
+        "status": "active",
+        "location_id": 2,
+    }
+    return CameraRow(**(values | overrides))
+
+
+def test_camera_row_to_domain():
+    camera = mappers.camera_to_domain(camera_row(status="maintenance"))
+    assert camera.id == 1
+    assert camera.ip_address == ipaddress.ip_address("192.0.2.10")
+    assert camera.status is CameraStatus.MAINTENANCE
+    assert camera.location_id == 2
+
+
+@pytest.mark.parametrize(
+    "stored", ["192.0.2.10/32", ipaddress.ip_address("192.0.2.10"), " 192.0.2.10"]
+)
+def test_camera_ip_accepts_what_the_driver_returns(stored):
+    camera = mappers.camera_to_domain(camera_row(ip_address=stored))
+    assert camera.ip_address == ipaddress.ip_address("192.0.2.10")
+
+
+def test_apply_camera_copies_the_changes_to_the_row():
+    row = camera_row()
+    camera = mappers.camera_to_domain(row)
+    camera.change_status("disconnected")
+    mappers.apply_camera(camera, row)
+    assert row.status == "disconnected"
+    assert row.ip_address == "192.0.2.10"
+    assert row.camera_id == 1
+
+
+def test_zone_row_to_domain():
+    row = ZoneRow(
+        zone_id=4,
+        name="Escalera",
+        description=None,
+        coordinates=[[0, 0], [1, 0], [1, 1]],
+        is_active=False,
+        camera_id=1,
+    )
+    zone = mappers.zone_to_domain(row)
+    assert zone.id == 4
+    assert zone.polygon.to_list() == [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]
+    assert zone.is_active is False
+    assert zone.belongs_to(1)
+
+
+def test_zone_with_too_few_points_is_rejected():
+    row = ZoneRow(zone_id=1, name="Mala", coordinates=[[0, 0]], is_active=True, camera_id=1)
+    with pytest.raises(ValidationError):
+        mappers.zone_to_domain(row)
