@@ -1,7 +1,8 @@
 """Event history with the filters of the panel: text, priority, status, camera and dates."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date
 
+from safevision.application.date_range import local_day_range
 from safevision.application.dto import EventView
 from safevision.application.ports.repositories import EventFilter
 from safevision.application.ports.unit_of_work import UnitOfWork
@@ -33,15 +34,16 @@ class ListEvents:
         ``date_to`` are local dates in the configured time zone, both inclusive.
         ``offset`` and ``limit`` page the filtered result; without them nothing is cut.
         """
-        if date_from is not None and date_to is not None and date_from > date_to:
-            raise ValidationError("La fecha 'desde' no puede ser posterior a 'hasta'")
+        occurred_from, occurred_before = local_day_range(
+            date_from, date_to, self._presenter.timezone
+        )
         with self._uow as uow:
             criteria = EventFilter(
                 statuses=self._statuses(status),
                 event_type_ids=self._event_type_ids(uow, priority),
                 camera_ids=None if camera_id is None else (camera_id,),
-                occurred_from=self._start_of(date_from),
-                occurred_before=self._start_of(date_to + timedelta(days=1) if date_to else None),
+                occurred_from=occurred_from,
+                occurred_before=occurred_before,
             )
             if not q:
                 # Paged by the repository: only the requested page is read and presented.
@@ -59,11 +61,6 @@ class ListEvents:
             )
         ]
         return views[offset:] if limit is None else views[offset : offset + limit]
-
-    def _start_of(self, day: date | None) -> datetime | None:
-        if day is None:
-            return None
-        return datetime.combine(day, time.min, tzinfo=self._presenter.timezone)
 
     @staticmethod
     def _statuses(label: str | None):
