@@ -62,3 +62,16 @@ def test_checker_detects_violations():
 def test_checker_does_not_confuse_similar_names():
     assert violations("import pydantic_settings_like\n", {"pydantic"}) == set()
     assert violations("from safevision.domain import x\n", RULES["application"]) == set()
+
+
+DDL_CALLS = ("create_all", "drop_all", "CREATE TABLE", "ALTER TABLE", "DROP TABLE")
+
+
+def test_source_never_runs_ddl():
+    """The production tables belong to another role: the backend only reads and writes rows."""
+    found = {
+        str(path.relative_to(SRC)): [call for call in DDL_CALLS if call in text]
+        for path in sorted(SRC.rglob("*.py"))
+        if any(call in (text := path.read_text(encoding="utf-8")) for call in DDL_CALLS)
+    }
+    assert found == {}
