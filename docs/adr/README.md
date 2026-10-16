@@ -11,3 +11,4 @@ se borra: se marca como sustituida y se enlaza la nueva.
 | [0003](0003-deduplicacion-60-segundos.md) | Deduplicar detecciones del IoT con una ventana de 60 s | Aceptada |
 | [0004](0004-websocket-colas-acotadas.md) | Alertas en vivo por WebSocket con colas acotadas por cliente | Aceptada |
 | [0005](0005-humo-dependencias-produccion.md) | Prueba de humo con el comando real y solo dependencias de producción | Aceptada |
+| [0006](0006-websocket-sin-autenticacion.md) | WebSocket de alertas sin autenticación | Aceptada |
