@@ -22,7 +22,3 @@ class EventType:
     @property
     def priority(self) -> Priority:
         return self.severity.priority
-
-    def has_name(self, name: str) -> bool:
-        """Case-insensitive name comparison, as used by the IoT module."""
-        return self.name.casefold() == name.strip().casefold()

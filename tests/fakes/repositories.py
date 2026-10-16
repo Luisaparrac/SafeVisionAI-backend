@@ -93,7 +93,9 @@ class InMemoryEventTypeRepository(InMemoryStore[EventType]):
         super().__init__("Tipo de evento")
 
     def find_by_name(self, name: str) -> EventType | None:
-        return next((t for t in self.all() if t.has_name(name)), None)
+        # Same rule as the SQL repository: lower(name) = lower(trimmed input).
+        wanted = name.strip().lower()
+        return next((t for t in self.all() if t.name.lower() == wanted), None)
 
     def list_all(self) -> list[EventType]:
         return sorted(self.all(), key=lambda t: (-t.severity.level, t.name))

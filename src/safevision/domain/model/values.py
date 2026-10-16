@@ -207,10 +207,6 @@ class CameraStatus(_ParsableEnum):
     DISCONNECTED = "disconnected"
     MAINTENANCE = "maintenance"
 
-    @property
-    def is_operational(self) -> bool:
-        return self is CameraStatus.ACTIVE
-
 
 class SubjectType(_ParsableEnum):
     """Kind of monitored subject."""
