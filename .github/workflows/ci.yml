@@ -43,7 +43,26 @@ jobs:
         run: ruff check .
       - name: Format
         run: ruff format --check .
-      - name: Tests (unit, contract and integration)
-        run: pytest
+      - name: Dead code
+        run: vulture
+      - name: Types (domain and application)
+        run: mypy
+      - name: Tests (unit, contract and integration) with coverage
+        run: pytest --cov --cov-report=term --cov-report=xml
+      - name: Coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: ignore
+      - name: Production-only environment (what the platform installs)
+        run: |
+          python -m venv /tmp/production
+          /tmp/production/bin/pip install -r requirements.txt
+          # Development tools must not leak into it.
+          ! /tmp/production/bin/python -c "import pytest"
       - name: Smoke test of the render.yaml start command
         run: pytest -m smoke
+        env:
+          SMOKE_BIN_DIR: /tmp/production/bin

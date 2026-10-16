@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from safevision.adapters.inbound.http.container import Container
+from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 from safevision.adapters.outbound.persistence.database import make_engine, make_session_factory
 from safevision.adapters.outbound.persistence.readiness import DatabaseReadinessProbe
 from safevision.adapters.outbound.persistence.unit_of_work import SqlAlchemyUnitOfWork
@@ -17,6 +18,10 @@ from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
+from safevision.application.use_cases.get_statistics import (
+    GetCameraStatistics,
+    GetEventTypeStatistics,
+)
 from safevision.application.use_cases.list_cameras import ListCameras
 from safevision.application.use_cases.list_event_types import ListEventTypes
 from safevision.application.use_cases.list_events import ListEvents
@@ -49,20 +54,24 @@ def build_container(
     presenter = EventPresenter(settings.tzinfo)
     board = AlertBoard(settings.history_capacity)
     deduplicator = EventDeduplicator(timedelta(seconds=settings.dedup_window_seconds), clock.now)
+    broadcaster = AlertBroadcaster()
     return Container(
         iot_api_key=settings.iot_api_key,
         cors_origins=settings.frontend_origins,
         readiness=readiness or AlwaysReady(),
+        alert_broadcaster=broadcaster,
         rebuild_alert_board=RebuildAlertBoard(uow, board, presenter),
-        register_event=RegisterEvent(uow, clock, board, deduplicator, presenter),
-        review_event=ReviewEvent(uow, clock, board, presenter),
-        mark_false_alarm=MarkFalseAlarm(uow, clock, board, presenter),
+        register_event=RegisterEvent(uow, clock, board, deduplicator, presenter, broadcaster),
+        review_event=ReviewEvent(uow, clock, board, presenter, broadcaster),
+        mark_false_alarm=MarkFalseAlarm(uow, clock, board, presenter, broadcaster),
         get_event=GetEvent(uow, presenter),
         list_events=ListEvents(uow, presenter),
         get_recent_events=GetRecentEvents(board),
         get_pending_alerts=GetPendingAlerts(uow, board, presenter),
         mark_alert_seen=MarkAlertSeen(uow, presenter),
         get_metrics=GetMetrics(uow, board),
+        event_type_statistics=GetEventTypeStatistics(uow, settings.tzinfo),
+        camera_statistics=GetCameraStatistics(uow, settings.tzinfo),
         list_event_types=ListEventTypes(uow),
         list_locations=ListLocations(uow),
         list_cameras=ListCameras(uow),

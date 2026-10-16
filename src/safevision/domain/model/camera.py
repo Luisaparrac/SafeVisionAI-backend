@@ -30,8 +30,12 @@ class Camera:
     def _parse_ip(value: object) -> IpAddress:
         if isinstance(value, IpAddress):
             return value
+        if isinstance(value, str):
+            value = value.strip()
+        if isinstance(value, bool) or not isinstance(value, str | int | bytes):
+            raise ValidationError(f"Dirección IP inválida: {value!r}")
         try:
-            return ipaddress.ip_address(value.strip() if isinstance(value, str) else value)
+            return ipaddress.ip_address(value)
         except ValueError:
             raise ValidationError(f"Dirección IP inválida: {value!r}") from None
 

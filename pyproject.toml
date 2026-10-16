@@ -8,7 +8,7 @@ requires-python = ">=3.12"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = [".venv", "venv"]
+extend-exclude = [".venv", "venv", "vulture_whitelist.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -18,7 +18,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "safevision"]
+known-first-party = ["safevision"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
@@ -28,3 +28,26 @@ markers = [
     "integration: requires a PostgreSQL test database (TEST_DATABASE_URL)",
     "smoke: starts the server with the start command of render.yaml (run with -m smoke)",
 ]
+
+[tool.vulture]
+# Production code only: code used just by tests is dead too.
+paths = ["src", "scripts", "vulture_whitelist.py"]
+min_confidence = 0
+
+[tool.coverage.run]
+source = ["safevision"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Checked in CI, which runs with PostgreSQL (99 % when this floor was set).
+# Without a database the persistence adapters are not measured.
+fail_under = 95
+
+[tool.mypy]
+# The core layers have no framework code, so they are checked strictly.
+files = ["src/safevision/domain", "src/safevision/application"]
+mypy_path = "src"
+python_version = "3.12"
+strict = true

@@ -26,9 +26,3 @@ class Zone:
 
     def belongs_to(self, camera_id: int) -> bool:
         return self.camera_id == camera_id
-
-    def activate(self) -> None:
-        self.is_active = True
-
-    def deactivate(self) -> None:
-        self.is_active = False

@@ -52,10 +52,10 @@ def test_add_assigns_ids_and_keeps_every_field(repo):
 
 def test_update_persists_changes(repo, session):
     event = repo.add(new_event())
-    event.start_review()
+    event.resolve()
     repo.update(event)
     stored = session.scalar(select(EventRow.status).where(EventRow.event_id == event.id))
-    assert stored == "in_review"
+    assert stored == "resolved"
 
 
 def test_update_of_missing_event_fails(repo):
@@ -116,3 +116,14 @@ def test_find_pages_with_offset_and_limit(repo):
     assert [e.id for e in repo.find(ALL, limit=2, offset=1)] == [4, 3]
     assert [e.id for e in repo.find(ALL, offset=3)] == [2, 1]
     assert repo.find(ALL, limit=2, offset=10) == []
+
+
+def test_counts_grouped_by_type_and_camera(repo):
+    repo.add(new_event(camera_id=1, event_type_id=1))
+    repo.add(new_event(camera_id=1, event_type_id=2, minutes=1))
+    repo.add(new_event(camera_id=2, event_type_id=1, minutes=2))
+    assert repo.count_by_event_type(ALL) == {1: 2, 2: 1}
+    assert repo.count_by_camera(ALL) == {1: 2, 2: 1}
+    later = EventFilter(occurred_from=T0 + timedelta(minutes=1))
+    assert repo.count_by_event_type(later) == {1: 1, 2: 1}
+    assert repo.count_by_camera(EventFilter(camera_ids=(3,))) == {}

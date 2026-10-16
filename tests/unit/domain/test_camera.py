@@ -24,7 +24,7 @@ def test_ipv6_and_address_objects_are_accepted():
     assert make_camera(ip_address=address).ip_address is address
 
 
-@pytest.mark.parametrize("ip", ["", "999.1.1.1", "camera.local", None, "10.0.0"])
+@pytest.mark.parametrize("ip", ["", "999.1.1.1", "camera.local", None, "10.0.0", True, 1.5])
 def test_invalid_ip_is_rejected(ip):
     with pytest.raises(ValidationError):
         make_camera(ip_address=ip)

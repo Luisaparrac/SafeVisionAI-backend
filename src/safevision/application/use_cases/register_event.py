@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 
-from safevision.application.dto import EventView
+from safevision.application.dto import NEW_ALERT, AlertNotification, AlertView, EventView
 from safevision.application.ports.clock import Clock
+from safevision.application.ports.notifier import AlertNotifier
 from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.application.presenter import EventPresenter
 from safevision.application.services.alert_board import AlertBoard
@@ -12,6 +13,7 @@ from safevision.domain.errors import NotFoundError, ValidationError
 from safevision.domain.model.alert import Alert
 from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
+from safevision.domain.model.identity import require_id
 from safevision.domain.structures.alert_priority_queue import AlertEntry
 
 
@@ -42,12 +44,14 @@ class RegisterEvent:
         board: AlertBoard,
         deduplicator: EventDeduplicator,
         presenter: EventPresenter,
+        notifier: AlertNotifier | None = None,
     ) -> None:
         self._uow = uow
         self._clock = clock
         self._board = board
         self._deduplicator = deduplicator
         self._presenter = presenter
+        self._notifier = notifier
 
     def execute(self, command: RegisterEventCommand) -> RegistrationResult:
         with self._uow as uow:
@@ -68,7 +72,7 @@ class RegisterEvent:
                     )
             event_type = self._event_type(uow, command)
 
-            key = (command.camera_id, event_type.id, command.subject_id)
+            key = (command.camera_id, require_id(event_type.id), command.subject_id)
             duplicate_id = self._deduplicator.find_recent(key)
             duplicate = None if duplicate_id is None else uow.events.get(duplicate_id)
             if duplicate is not None:
@@ -87,13 +91,22 @@ class RegisterEvent:
                     description=command.description,
                 )
             )
-            uow.alerts.add(Alert.for_event(event, event_type))
+            alert = uow.alerts.add(Alert.for_event(event, event_type))
             view = self._presenter.present(uow, event)
             uow.commit()
 
         # Memory is updated only after the commit succeeded.
-        self._board.add(AlertEntry(event.id, event_type.severity, event.occurred_at), view)
-        self._deduplicator.remember(key, event.id)
+        event_id = require_id(event.id)
+        self._board.add(AlertEntry(event_id, event_type.severity, event.occurred_at), view)
+        self._deduplicator.remember(key, event_id)
+        if self._notifier is not None:
+            alert_view = AlertView(
+                alert_id=require_id(alert.id),
+                level=alert.level.priority.value,
+                status=alert.status.label,
+                event=view,
+            )
+            self._notifier.publish(AlertNotification(NEW_ALERT, view, alert_view))
         return RegistrationResult(view, created=True)
 
     @staticmethod

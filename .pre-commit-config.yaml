@@ -1,0 +1,35 @@
+# Same checks as CI, run before each commit.
+# Setup (with the virtual environment active): pip install -r requirements-dev.txt
+# and then: pre-commit install
+# The hooks use the tools of the active environment, so versions match requirements-dev.txt.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format --check
+        entry: ruff format --check
+        language: system
+        types: [python]
+      - id: vulture
+        name: vulture (dead code)
+        entry: vulture
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: mypy
+        name: mypy (domain and application)
+        entry: mypy
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: pytest
+        name: pytest (without PostgreSQL tests unless TEST_DATABASE_URL is set)
+        entry: pytest -q
+        language: system
+        pass_filenames: false
+        types: [python]

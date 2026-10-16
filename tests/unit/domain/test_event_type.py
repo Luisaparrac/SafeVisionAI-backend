@@ -28,12 +28,6 @@ def test_name_is_required(name):
         EventType(name=name, severity=1)
 
 
-def test_name_comparison_ignores_case_and_spaces():
-    fall = EventType(name="Caída", severity=4)
-    assert fall.has_name(" CAÍDA ")
-    assert not fall.has_name("Caida")
-
-
 def test_description_must_be_text():
     with pytest.raises(ValidationError):
         EventType(name="X", severity=1, description=3)

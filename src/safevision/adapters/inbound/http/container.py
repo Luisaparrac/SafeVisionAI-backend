@@ -6,11 +6,16 @@ read it from the application state, so they never create infrastructure.
 
 from dataclasses import dataclass, field
 
+from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 from safevision.application.ports.readiness import ReadinessProbe
 from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
+from safevision.application.use_cases.get_statistics import (
+    GetCameraStatistics,
+    GetEventTypeStatistics,
+)
 from safevision.application.use_cases.list_cameras import ListCameras
 from safevision.application.use_cases.list_event_types import ListEventTypes
 from safevision.application.use_cases.list_events import ListEvents
@@ -30,6 +35,7 @@ class Container:
     iot_api_key: str = field(repr=False)
     cors_origins: tuple[str, ...]
     readiness: ReadinessProbe
+    alert_broadcaster: AlertBroadcaster
 
     rebuild_alert_board: RebuildAlertBoard
     register_event: RegisterEvent
@@ -41,6 +47,8 @@ class Container:
     get_pending_alerts: GetPendingAlerts
     mark_alert_seen: MarkAlertSeen
     get_metrics: GetMetrics
+    event_type_statistics: GetEventTypeStatistics
+    camera_statistics: GetCameraStatistics
     list_event_types: ListEventTypes
     list_locations: ListLocations
     list_cameras: ListCameras

@@ -5,6 +5,7 @@ Entities are copied on the way in and out, so a use case that forgets to call
 """
 
 import copy
+from collections import Counter
 
 from safevision.application.ports.repositories import EventFilter
 from safevision.domain.errors import NotFoundError
@@ -67,6 +68,12 @@ class InMemoryEventRepository(InMemoryStore[Event]):
     def count(self, criteria: EventFilter) -> int:
         return len(self.find(criteria))
 
+    def count_by_event_type(self, criteria: EventFilter) -> dict[int, int]:
+        return dict(Counter(event.event_type_id for event in self.find(criteria)))
+
+    def count_by_camera(self, criteria: EventFilter) -> dict[int, int]:
+        return dict(Counter(event.camera_id for event in self.find(criteria)))
+
     @staticmethod
     def _matches(event: Event, criteria: EventFilter) -> bool:
         if criteria.statuses is not None and event.status not in criteria.statuses:
@@ -93,7 +100,9 @@ class InMemoryEventTypeRepository(InMemoryStore[EventType]):
         super().__init__("Tipo de evento")
 
     def find_by_name(self, name: str) -> EventType | None:
-        return next((t for t in self.all() if t.has_name(name)), None)
+        # Same rule as the SQL repository: lower(name) = lower(trimmed input).
+        wanted = name.strip().lower()
+        return next((t for t in self.all() if t.name.lower() == wanted), None)
 
     def list_all(self) -> list[EventType]:
         return sorted(self.all(), key=lambda t: (-t.severity.level, t.name))

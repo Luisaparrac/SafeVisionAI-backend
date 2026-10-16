@@ -8,8 +8,8 @@ data to the frontend.
 
 | Structure | File | Role in the system |
 |---|---|---|
-| Max-heap priority queue with position index | `app/structures/priority_queue.py` | Orders pending alerts by severity, then by age. Reviewing an alert removes it in O(log n). |
-| Bounded doubly linked list | `app/structures/event_history.py` | Recent event history (newest at head). Insert O(1), drop oldest O(1), update by id O(1). |
+| Max-heap priority queue with position index | `src/safevision/domain/structures/alert_priority_queue.py` | Orders pending alerts by severity, then by age. Reviewing an alert removes it in O(log n). |
+| Bounded doubly linked list | `src/safevision/domain/structures/event_history.py` | Recent event history (newest at head). Insert O(1), drop oldest O(1), update by id O(1). |
 
 The database is the source of truth; both structures are rebuilt from it on startup and
 kept in sync on every create/review.
@@ -43,7 +43,7 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env             # macOS/Linux: cp .env.example .env
 # edit .env with your connection data (password URL-encoded: ! -> %21)
-uvicorn app.main:app --reload
+uvicorn safevision.adapters.inbound.http.app:app --app-dir src --reload
 ```
 
 Interactive docs: http://localhost:8000/docs
@@ -51,7 +51,7 @@ Interactive docs: http://localhost:8000/docs
 Send a test event (simulates the IoT module):
 
 ```bash
-python scripts/simulate_event.py --key YOUR_IOT_API_KEY
+python scripts/simulate_event.py --url http://localhost:8000 --key YOUR_IOT_API_KEY
 ```
 
 ## Endpoints

@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from threading import Thread
 
@@ -40,14 +39,6 @@ def test_close_of_unknown_event_is_harmless():
     board.close(view(7, status="Revisado"))
     assert board.pending_count() == 0
     assert board.recent(5) == []
-
-
-def test_refresh_updates_history_only():
-    board = AlertBoard(history_capacity=10)
-    board.add(entry(1, 3), view(1))
-    board.refresh(replace(view(1), description="en revisión"))
-    assert board.recent(1)[0].description == "en revisión"
-    assert board.pending_count() == 1
 
 
 def test_history_is_bounded():

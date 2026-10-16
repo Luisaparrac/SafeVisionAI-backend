@@ -5,9 +5,10 @@ frontend displays.
 """
 
 import math
-import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Self
 
 from safevision.domain.errors import InvalidTransitionError, ValidationError
 
@@ -16,7 +17,7 @@ class _ParsableEnum(StrEnum):
     """String enum whose ``parse`` raises a domain error instead of ``ValueError``."""
 
     @classmethod
-    def parse(cls, value: str):
+    def parse(cls, value: str) -> Self:
         try:
             return cls(value)
         except ValueError:
@@ -208,10 +209,6 @@ class CameraStatus(_ParsableEnum):
     DISCONNECTED = "disconnected"
     MAINTENANCE = "maintenance"
 
-    @property
-    def is_operational(self) -> bool:
-        return self is CameraStatus.ACTIVE
-
 
 class SubjectType(_ParsableEnum):
     """Kind of monitored subject."""
@@ -252,7 +249,7 @@ class ZonePolygon:
     MIN_POINTS = 3
 
     def __post_init__(self) -> None:
-        if isinstance(self.points, str | bytes) or not hasattr(self.points, "__iter__"):
+        if isinstance(self.points, str | bytes) or not isinstance(self.points, Iterable):
             raise ValidationError("Las coordenadas de la zona deben ser una lista de puntos")
         points = tuple(self._point(raw) for raw in self.points)
         if len(points) < self.MIN_POINTS:
@@ -263,7 +260,7 @@ class ZonePolygon:
 
     @staticmethod
     def _point(raw: object) -> Point:
-        if isinstance(raw, str | bytes) or not hasattr(raw, "__len__") or len(raw) != 2:
+        if isinstance(raw, str | bytes) or not isinstance(raw, Sequence) or len(raw) != 2:
             raise ValidationError(f"Cada punto debe ser [x, y], no {raw!r}")
         x, y = raw
         if not (_is_real_number(x) and _is_real_number(y)):
@@ -271,31 +268,10 @@ class ZonePolygon:
         return (float(x), float(y))
 
     @classmethod
-    def from_list(cls, coordinates: list) -> "ZonePolygon":
-        return cls(tuple(coordinates) if isinstance(coordinates, list) else coordinates)
+    def from_list(cls, coordinates: object) -> "ZonePolygon":
+        """From the JSON value stored in the database; anything else is rejected."""
+        return cls(tuple(coordinates) if isinstance(coordinates, list) else coordinates)  # type: ignore[arg-type]
 
     def to_list(self) -> list[list[float]]:
         """The JSON shape stored in the database."""
         return [[x, y] for x, y in self.points]
-
-
-# Same pattern as the database constraint chk_users_email (case-insensitive match).
-_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", re.IGNORECASE)
-
-
-@dataclass(frozen=True)
-class Email:
-    """E-mail address of a panel user."""
-
-    value: str
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.value, str):
-            raise ValidationError("El correo debe ser texto")
-        value = self.value.strip()
-        if not _EMAIL_PATTERN.fullmatch(value):
-            raise ValidationError(f"Correo inválido: {value!r}")
-        object.__setattr__(self, "value", value)
-
-    def __str__(self) -> str:
-        return self.value

@@ -33,3 +33,35 @@ class Metrics:
     total: int
     pending: int
     high: int
+
+
+NEW_ALERT = "new_alert"
+EVENT_CLOSED = "event_closed"
+
+
+@dataclass(frozen=True)
+class AlertNotification:
+    """Something the panel should hear about right away.
+
+    ``new_alert``: an event was registered and raised ``alert``.
+    ``event_closed``: ``event`` was reviewed or marked as a false alarm.
+    """
+
+    kind: str
+    event: EventView
+    alert: AlertView | None = None
+
+
+@dataclass(frozen=True)
+class EventTypeCount:
+    event_type_id: int
+    name: str
+    priority: str  # Alto / Medio / Bajo
+    total: int
+
+
+@dataclass(frozen=True)
+class CameraCount:
+    camera_id: int
+    name: str
+    total: int

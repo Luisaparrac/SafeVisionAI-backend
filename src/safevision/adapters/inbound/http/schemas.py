@@ -179,3 +179,20 @@ class SubjectOut(BaseModel):
             subject_type=subject.subject_type.value,
             description=subject.description,
         )
+
+
+class EventTypeCountOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_type_id: int
+    name: str
+    priority: str
+    total: int
+
+
+class CameraCountOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    camera_id: int
+    name: str
+    total: int

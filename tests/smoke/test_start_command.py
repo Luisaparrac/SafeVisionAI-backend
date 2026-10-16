@@ -2,7 +2,8 @@
 
 The command is read from render.yaml and only $PORT is replaced, so this checks
 exactly what the hosting platform will run. Excluded from the default run;
-execute it with ``pytest -m smoke`` (needs TEST_DATABASE_URL).
+execute it with ``pytest -m smoke`` (needs TEST_DATABASE_URL). With SMOKE_BIN_DIR
+the server runs from another environment, one with production dependencies only.
 """
 
 import json
@@ -19,6 +20,7 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+from websockets.sync.client import connect
 
 pytestmark = pytest.mark.smoke
 
@@ -55,8 +57,10 @@ def call(base: str, method: str, path: str, body: dict | None = None, key: str |
 def server(pg_seeded, tmp_path):
     port = free_port()
     args = shlex.split(start_command().replace("$PORT", str(port)))
-    # The executable of this environment (the platform runs it from its PATH).
-    search = os.pathsep.join([str(Path(sys.executable).parent), os.environ.get("PATH", "")])
+    # SMOKE_BIN_DIR points to an environment with only requirements.txt installed, as
+    # on the platform (CI sets it); by default, the executables of this environment.
+    bin_dir = os.environ.get("SMOKE_BIN_DIR") or str(Path(sys.executable).parent)
+    search = os.pathsep.join([bin_dir, os.environ.get("PATH", "")])
     executable = shutil.which(args[0], path=search)
     assert executable, f"{args[0]} not found"
     env = os.environ | {
@@ -109,8 +113,13 @@ def test_start_command_serves_the_contract(server):
     status, body = call(server, "POST", "/api/eventos", event)
     assert (status, body) == (401, {"detail": "X-API-Key inválida"})
 
-    status, created = call(server, "POST", "/api/eventos", event, key=KEY)
-    assert status == 201
+    # The live feed works with the WebSocket support of the production server.
+    with connect(server.replace("http://", "ws://") + "/ws/alertas", open_timeout=10) as feed:
+        status, created = call(server, "POST", "/api/eventos", event, key=KEY)
+        assert status == 201
+        message = json.loads(feed.recv(timeout=10))
+    assert message["tipo"] == "alerta_nueva"
+    assert message["alerta"]["event"] == created
     assert (created["type"], created["location"], created["status"]) == (
         "Caída",
         "Casa · Escalera",

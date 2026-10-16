@@ -5,6 +5,7 @@ from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.application.presenter import EventPresenter
 from safevision.application.services.alert_board import AlertBoard
 from safevision.domain.errors import NotFoundError
+from safevision.domain.model.identity import require_id
 from safevision.domain.model.values import ReviewLabel
 from safevision.domain.structures.alert_priority_queue import AlertEntry
 
@@ -24,7 +25,9 @@ class RebuildAlertBoard:
                 if event.event_type_id not in severities:
                     raise NotFoundError("Tipo de evento", event.event_type_id)
                 entries.append(
-                    AlertEntry(event.id, severities[event.event_type_id], event.occurred_at)
+                    AlertEntry(
+                        require_id(event.id), severities[event.event_type_id], event.occurred_at
+                    )
                 )
             recent = uow.events.find(EventFilter(), limit=self._board.history_capacity)
             views = self._presenter.present_many(uow, recent)

@@ -19,12 +19,9 @@ def test_belongs_to_its_camera_only():
     assert not zone.belongs_to(3)
 
 
-def test_activation():
-    zone = Zone(name="Escalera", camera_id=2, polygon=SQUARE, is_active=False)
-    zone.activate()
-    assert zone.is_active
-    zone.deactivate()
-    assert not zone.is_active
+def test_inactive_zone():
+    zone = Zone(name="Escalera", camera_id=2, polygon=SQUARE, is_active=0)
+    assert zone.is_active is False
 
 
 def test_polygon_needs_three_points():
