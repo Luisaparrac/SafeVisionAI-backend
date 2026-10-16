@@ -54,3 +54,28 @@ def create_app(container: Container) -> FastAPI:
     app.include_router(catalogos.router)
     app.include_router(camaras.router)
     return app
+
+
+def create_app_from_env() -> FastAPI:
+    """Production entry point: settings from the environment (and from .env when present).
+
+    Only DATABASE_URL and IOT_API_KEY are required; if either is missing the
+    process stops here instead of answering requests.
+    """
+    from dotenv import load_dotenv
+
+    from safevision.bootstrap import build_production_container
+    from safevision.config.settings import Settings
+
+    load_dotenv()  # local runs; on the hosting platform the variables come from its dashboard
+    return create_app(build_production_container(Settings.from_env()))
+
+
+def __getattr__(name: str) -> FastAPI:
+    # "uvicorn safevision.adapters.inbound.http.app:app" builds the application on
+    # first access, so importing create_app (tests, tools) never reads the environment.
+    if name != "app":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    app = create_app_from_env()
+    globals()["app"] = app
+    return app
