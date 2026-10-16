@@ -4,19 +4,22 @@ Each repository works on the session of the current unit of work: it flushes
 its changes so ids and constraints are checked at once, but never commits.
 """
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from safevision.adapters.outbound.persistence import mappers
 from safevision.adapters.outbound.persistence.orm import (
     CameraRow,
+    EventRow,
     EventTypeRow,
     LocationRow,
     SubjectRow,
     ZoneRow,
 )
+from safevision.application.ports.repositories import EventFilter
 from safevision.domain.errors import NotFoundError
 from safevision.domain.model.camera import Camera
+from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.location import Location
 from safevision.domain.model.subject import Subject
@@ -94,3 +97,45 @@ class SqlAlchemyCameraRepository:
     def list_zones(self) -> list[Zone]:
         rows = self._session.scalars(select(ZoneRow).order_by(ZoneRow.zone_id))
         return [mappers.zone_to_domain(row) for row in rows]
+
+
+class SqlAlchemyEventRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, event_id: int) -> Event | None:
+        row = self._session.get(EventRow, event_id)
+        return None if row is None else mappers.event_to_domain(row)
+
+    def add(self, event: Event) -> Event:
+        row = mappers.event_to_row(event)
+        self._session.add(row)
+        self._session.flush()
+        return mappers.event_to_domain(row)
+
+    def update(self, event: Event) -> None:
+        row = None if event.id is None else self._session.get(EventRow, event.id)
+        if row is None:
+            raise NotFoundError("Evento", event.id)
+        mappers.apply_event(event, row)
+        self._session.flush()
+
+    def find(self, criteria: EventFilter, limit: int | None = None) -> list[Event]:
+        statement = _filtered(select(EventRow), criteria).order_by(
+            EventRow.occurred_at.desc(), EventRow.event_id.desc()
+        )
+        if limit is not None:
+            statement = statement.limit(limit)
+        return [mappers.event_to_domain(row) for row in self._session.scalars(statement)]
+
+    def count(self, criteria: EventFilter) -> int:
+        statement = _filtered(select(func.count(EventRow.event_id)), criteria)
+        return self._session.scalar(statement) or 0
+
+
+def _filtered[S: Select](statement: S, criteria: EventFilter) -> S:
+    if criteria.statuses is not None:
+        statement = statement.where(EventRow.status.in_([s.value for s in criteria.statuses]))
+    if criteria.event_type_ids is not None:
+        statement = statement.where(EventRow.event_type_id.in_(criteria.event_type_ids))
+    return statement
