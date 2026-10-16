@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.errors import install_error_handlers
+from safevision.adapters.inbound.http.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from safevision.adapters.inbound.http.routers import alertas, camaras, catalogos, eventos, health
 from safevision.adapters.inbound.http.routers.eventos import DUPLICATE_HEADER
 
@@ -40,12 +41,14 @@ def create_app(container: Container) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.container = container
+    app.add_middleware(RequestIdMiddleware)
+    # Added last, so it is the outermost middleware and also answers preflight requests.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(container.cors_origins),
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=[DUPLICATE_HEADER],
+        expose_headers=[DUPLICATE_HEADER, REQUEST_ID_HEADER],
     )
     install_error_handlers(app)
     app.include_router(health.router)
