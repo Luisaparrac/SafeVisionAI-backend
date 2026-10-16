@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.errors import install_error_handlers
 from safevision.adapters.inbound.http.routers import camaras, catalogos, eventos, health
+from safevision.adapters.inbound.http.routers.eventos import DUPLICATE_HEADER
 
 DESCRIPTION = (
     "API de SafeVision AI: recibe las detecciones del módulo IoT y sirve al panel "
@@ -43,6 +44,7 @@ def create_app(container: Container) -> FastAPI:
         allow_origins=list(container.cors_origins),
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=[DUPLICATE_HEADER],
     )
     install_error_handlers(app)
     app.include_router(health.router)

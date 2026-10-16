@@ -64,3 +64,27 @@ def test_review(client):
     assert response.status_code == 200
     assert response.json()["status"] == "Revisado"
     assert client.patch("/api/eventos/999/revisar").status_code == 404
+
+
+def test_repeated_detection_returns_the_same_event_marked_as_duplicate(client, clock, uow):
+    first = client.post("/api/eventos", json={"camera_id": 1, "event_type_id": 1}, headers=KEY)
+    assert "x-duplicate" not in first.headers
+    clock.advance(3)
+    again = client.post("/api/eventos", json={"camera_id": 1, "event_type_id": 1}, headers=KEY)
+    assert again.status_code == 201
+    assert again.headers["x-duplicate"] == "true"
+    assert again.json() == first.json()
+    assert len(uow.events.all()) == 1
+
+
+def test_detection_after_the_window_is_a_new_event(client, clock, settings):
+    first = post(client, camera_id=1, event_type_id=1)
+    clock.advance(settings.dedup_window_seconds)
+    response = client.post("/api/eventos", json={"camera_id": 1, "event_type_id": 1}, headers=KEY)
+    assert "x-duplicate" not in response.headers
+    assert response.json()["id"] != first["id"]
+
+
+def test_browsers_can_read_the_duplicate_header(client):
+    response = client.get("/health", headers={"Origin": "http://localhost:5173"})
+    assert "X-Duplicate" in response.headers["access-control-expose-headers"]

@@ -1,6 +1,6 @@
 """Events: detections registered by the IoT module and reviewed from the panel."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
@@ -8,6 +8,9 @@ from safevision.adapters.inbound.http.schemas import EventIn, EventOut
 from safevision.adapters.inbound.http.security import require_iot_key
 
 router = APIRouter(prefix="/api/eventos", tags=["eventos"])
+
+# Sent when a repeated detection reused a recent event instead of creating one.
+DUPLICATE_HEADER = "X-Duplicate"
 
 
 @router.get("", response_model=list[EventOut])
@@ -42,9 +45,17 @@ def get_event(event_id: int, container: Container = Depends(get_container)) -> E
     status_code=201,
     dependencies=[Depends(require_iot_key)],
 )
-def register_event(data: EventIn, container: Container = Depends(get_container)) -> EventOut:
-    """Registers a detection of the IoT module (requires X-API-Key) and raises its alert."""
+def register_event(
+    data: EventIn, response: Response, container: Container = Depends(get_container)
+) -> EventOut:
+    """Registers a detection of the IoT module (requires X-API-Key) and raises its alert.
+
+    A detection repeated within the deduplication window returns the event
+    already registered, still with 201, and the header ``X-Duplicate: true``.
+    """
     result = container.register_event.execute(data.to_command())
+    if not result.created:
+        response.headers[DUPLICATE_HEADER] = "true"
     return EventOut.from_view(result.view)
 
 
