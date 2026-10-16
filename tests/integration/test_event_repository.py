@@ -97,3 +97,14 @@ def test_find_and_count_by_camera(repo):
     assert [e.id for e in repo.find(EventFilter(camera_ids=(1,)))] == [3, 1]
     assert repo.count(EventFilter(camera_ids=(2,))) == 1
     assert repo.find(EventFilter(camera_ids=())) == []
+
+
+def test_find_by_time_range(repo):
+    repo.add(new_event(minutes=0))
+    repo.add(new_event(minutes=10))
+    repo.add(new_event(minutes=20))
+    window = EventFilter(
+        occurred_from=T0 + timedelta(minutes=10), occurred_before=T0 + timedelta(minutes=20)
+    )
+    assert [e.id for e in repo.find(window)] == [2]
+    assert repo.count(EventFilter(occurred_from=T0 + timedelta(minutes=10))) == 2

@@ -142,6 +142,10 @@ def _filtered[S: Select](statement: S, criteria: EventFilter) -> S:
         statement = statement.where(EventRow.event_type_id.in_(criteria.event_type_ids))
     if criteria.camera_ids is not None:
         statement = statement.where(EventRow.camera_id.in_(criteria.camera_ids))
+    if criteria.occurred_from is not None:
+        statement = statement.where(EventRow.occurred_at >= criteria.occurred_from)
+    if criteria.occurred_before is not None:
+        statement = statement.where(EventRow.occurred_at < criteria.occurred_before)
     return statement
 
 

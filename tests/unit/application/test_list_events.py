@@ -1,8 +1,10 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from safevision.application.use_cases.list_events import ListEvents
+from safevision.domain.errors import ValidationError
 from safevision.domain.model.event import Event
 
 
@@ -77,3 +79,33 @@ def test_filter_by_camera(list_events):
     assert ids(list_events.execute(camera_id=2)) == [3]
     assert ids(list_events.execute(camera_id=1, status="Pendiente")) == [4, 1]
     assert list_events.execute(camera_id=99) == []
+
+
+BOGOTA = ZoneInfo("America/Bogota")
+
+
+@pytest.fixture
+def by_date(uow, presenter) -> ListEvents:
+    """Events at local (Bogotá) times around two midnights."""
+    for local in [
+        datetime(2026, 10, 13, 23, 59, tzinfo=BOGOTA),
+        datetime(2026, 10, 14, 0, 0, tzinfo=BOGOTA),
+        datetime(2026, 10, 14, 23, 59, 59, tzinfo=BOGOTA),
+        datetime(2026, 10, 15, 0, 0, tzinfo=BOGOTA),
+    ]:
+        uow.events.add(Event(camera_id=1, event_type_id=1, occurred_at=local))
+    uow.commit()
+    return ListEvents(uow, presenter)
+
+
+def test_filter_by_dates_uses_local_days_inclusive(by_date):
+    day = date(2026, 10, 14)
+    assert ids(by_date.execute(date_from=day, date_to=day)) == [3, 2]
+    assert ids(by_date.execute(date_from=day)) == [4, 3, 2]
+    assert ids(by_date.execute(date_to=day)) == [3, 2, 1]
+    assert by_date.execute(date_from=date(2026, 11, 1)) == []
+
+
+def test_reversed_dates_are_rejected(by_date):
+    with pytest.raises(ValidationError):
+        by_date.execute(date_from=date(2026, 10, 15), date_to=date(2026, 10, 14))

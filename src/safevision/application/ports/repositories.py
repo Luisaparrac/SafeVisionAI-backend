@@ -5,6 +5,7 @@ when the surrounding unit of work commits.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from safevision.domain.model.alert import Alert
@@ -24,6 +25,8 @@ class EventFilter:
     statuses: tuple[EventStatus, ...] | None = None
     event_type_ids: tuple[int, ...] | None = None
     camera_ids: tuple[int, ...] | None = None
+    occurred_from: datetime | None = None  # inclusive
+    occurred_before: datetime | None = None  # exclusive
 
 
 @runtime_checkable

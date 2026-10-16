@@ -1,5 +1,7 @@
 """Events: detections registered by the IoT module and reviewed from the panel."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, Response
 
 from safevision.adapters.inbound.http.container import Container
@@ -19,11 +21,18 @@ def list_events(
     prioridad: str | None = Query(None, description="Alto, Medio o Bajo"),
     estado: str | None = Query(None, description="Pendiente o Revisado"),
     camara_id: int | None = Query(None, description="Solo eventos de esta cámara"),
+    desde: date | None = Query(None, description="Fecha local inicial (AAAA-MM-DD), inclusive"),
+    hasta: date | None = Query(None, description="Fecha local final (AAAA-MM-DD), inclusive"),
     container: Container = Depends(get_container),
 ) -> list[EventOut]:
     """Newest first. ``q`` searches the id, type, subject and location."""
     views = container.list_events.execute(
-        q=q, priority=prioridad, status=estado, camera_id=camara_id
+        q=q,
+        priority=prioridad,
+        status=estado,
+        camera_id=camara_id,
+        date_from=desde,
+        date_to=hasta,
     )
     return [EventOut.from_view(view) for view in views]
 

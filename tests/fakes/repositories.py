@@ -73,6 +73,10 @@ class InMemoryEventRepository(InMemoryStore[Event]):
             return False
         if criteria.camera_ids is not None and event.camera_id not in criteria.camera_ids:
             return False
+        if criteria.occurred_from is not None and event.occurred_at < criteria.occurred_from:
+            return False
+        if criteria.occurred_before is not None and event.occurred_at >= criteria.occurred_before:
+            return False
         return criteria.event_type_ids is None or event.event_type_id in criteria.event_type_ids
 
 

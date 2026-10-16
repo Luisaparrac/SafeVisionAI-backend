@@ -107,3 +107,18 @@ def test_filter_by_camera(client, clock):
     combined = client.get("/api/eventos", params={"camara_id": 1, "prioridad": "Alto"})
     assert combined.json() == []
     assert client.get("/api/eventos", params={"camara_id": "sala"}).status_code == 422
+
+
+def test_filter_by_dates(client, clock):
+    # FakeClock: 2026-10-14 12:00 UTC, 07:00 in Bogotá.
+    today = post(client, camera_id=1, event_type_id=3)
+    clock.advance(24 * 3600)
+    tomorrow = post(client, camera_id=1, event_type_id=3)
+    params = {"desde": "2026-10-14", "hasta": "2026-10-14"}
+    assert client.get("/api/eventos", params=params).json() == [today]
+    assert client.get("/api/eventos", params={"desde": "2026-10-15"}).json() == [tomorrow]
+    reversed_range = client.get(
+        "/api/eventos", params={"desde": "2026-10-15", "hasta": "2026-10-14"}
+    )
+    assert reversed_range.status_code == 422
+    assert client.get("/api/eventos", params={"desde": "14/10/2026"}).status_code == 422
