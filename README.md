@@ -116,6 +116,26 @@ python scripts/simulate_event.py --url http://localhost:8000 --key TU_IOT_API_KE
 python scripts/simulate_event.py --url http://localhost:8000 --key TU_IOT_API_KEY --tipo "Caída" --camara 1
 ```
 
+## Variables de entorno
+
+`src/safevision/config/settings.py` las lee al arrancar. Si falta una
+obligatoria o un valor es inválido, el proceso se detiene con un mensaje claro
+en lugar de fallar en la primera petición. `.env.example` tiene la lista con
+marcadores.
+
+| Variable | Obligatoria | Valor por defecto | Descripción |
+|---|---|---|---|
+| `DATABASE_URL` | Sí | — | URL de PostgreSQL, por ejemplo `postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require`. Los caracteres especiales de la contraseña van codificados (`!` → `%21`). `postgres://` también se acepta. |
+| `IOT_API_KEY` | Sí | — | Clave que el módulo IoT envía en `X-API-Key` para crear eventos y actualizar cámaras. Usa un valor largo y aleatorio. |
+| `FRONTEND_ORIGINS` | No | `http://localhost:5173` | Orígenes permitidos por CORS, separados por comas. |
+| `TIMEZONE` | No | `America/Bogota` | Zona horaria en la que se muestran `date` y `time` y se leen los filtros por fecha. |
+| `HISTORY_CAPACITY` | No | `100` | Eventos que guarda el historial reciente en memoria. |
+| `DEDUP_WINDOW_SECONDS` | No | `60` | Segundos, desde la primera detección, en los que una detección repetida reutiliza el evento. `0` desactiva la deduplicación. |
+| `LOG_LEVEL` | No | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` o `CRITICAL`. |
+
+Las claves nunca aparecen en los registros: un filtro oculta credenciales de
+URLs y valores de campos como `password` o `api_key`.
+
 ## Endpoints
 
 | Method | Path | Used by |
@@ -156,15 +176,6 @@ The database sets `occurred_at`; an alert with `level = severity_level` is creat
 
 Camera status: `PATCH /api/camaras/{id}/estado` with `{"status": "active"}`
 (active, inactive, disconnected, maintenance).
-
-## Environment variables
-
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL URL with `?sslmode=require`. Required. |
-| `IOT_API_KEY` | Key required to create events and update camera status. Required: the app does not start without it. |
-| `FRONTEND_ORIGINS` | Allowed CORS origins, comma separated. |
-| `TIMEZONE` | Default `America/Bogota`. |
 
 ## Deploy on Render
 
