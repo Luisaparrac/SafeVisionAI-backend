@@ -1,9 +1,10 @@
 """PostgreSQL fixtures for integration and contract tests (pytest plugin).
 
 They use only TEST_DATABASE_URL; without it the tests that need a database are
-skipped. Before any DDL the guard checks that the URL is a local "*_test"
-database. Then the tables of schema.sql are dropped and recreated once per
-session, and emptied before each test so identifiers always start at 1.
+skipped, or fail when REQUIRE_TEST_DATABASE=1 (as in CI). Before any DDL the
+guard checks that the URL is a local "*_test" database. Then the tables of
+schema.sql are dropped and recreated once per session, and emptied before each
+test so identifiers always start at 1.
 """
 
 import os
@@ -39,7 +40,10 @@ def schema_statements() -> list[str]:
 def pg_engine() -> Engine:
     url = os.environ.get("TEST_DATABASE_URL", "").strip()
     if not url:
-        pytest.skip("TEST_DATABASE_URL no está definida: pruebas con PostgreSQL omitidas")
+        message = "TEST_DATABASE_URL no está definida: pruebas con PostgreSQL omitidas"
+        if os.environ.get("REQUIRE_TEST_DATABASE") == "1":  # CI must not skip them silently
+            pytest.fail(message, pytrace=False)
+        pytest.skip(message)
     try:
         ensure_safe_test_database(url)
     except UnsafeTestDatabaseError as error:
