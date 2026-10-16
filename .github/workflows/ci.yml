@@ -45,5 +45,13 @@ jobs:
         run: ruff format --check .
       - name: Tests (unit, contract and integration)
         run: pytest
+      - name: Production-only environment (what the platform installs)
+        run: |
+          python -m venv /tmp/production
+          /tmp/production/bin/pip install -r requirements.txt
+          # Development tools must not leak into it.
+          ! /tmp/production/bin/python -c "import pytest"
       - name: Smoke test of the render.yaml start command
         run: pytest -m smoke
+        env:
+          SMOKE_BIN_DIR: /tmp/production/bin
