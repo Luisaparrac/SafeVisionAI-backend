@@ -100,6 +100,7 @@ def server(pg_seeded, tmp_path):
 
 def test_start_command_serves_the_contract(server):
     assert call(server, "GET", "/health") == (200, {"status": "ok"})
+    assert call(server, "GET", "/health/ready") == (200, {"status": "ok", "database": "ok"})
     assert call(server, "GET", "/api/eventos") == (200, [])
     assert call(server, "GET", "/api/alertas/pendientes") == (200, [])
     assert call(server, "GET", "/api/metricas") == (200, {"total": 0, "pendientes": 0, "alto": 0})
