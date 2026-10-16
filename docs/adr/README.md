@@ -1,0 +1,9 @@
+# Decisiones de arquitectura (ADR)
+
+Cada archivo registra una decisión: el contexto, lo que se decidió, sus
+consecuencias y las alternativas descartadas. Una decisión que se reemplaza no
+se borra: se marca como sustituida y se enlaza la nueva.
+
+| ADR | Decisión | Estado |
+|---|---|---|
+| [0001](0001-arquitectura-hexagonal.md) | Arquitectura hexagonal con migración por estrangulamiento | Aceptada |
