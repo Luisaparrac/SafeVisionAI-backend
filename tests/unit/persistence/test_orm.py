@@ -1,0 +1,63 @@
+"""The ORM mapping matches the reference schema, without touching any database."""
+
+import re
+from pathlib import Path
+
+import pytest
+
+from safevision.adapters.outbound.persistence import orm
+
+SCHEMA = Path(__file__).resolve().parents[2] / "integration" / "schema.sql"
+
+_TABLE = re.compile(r"CREATE TABLE (\w+) \((.*?)\n\);", re.DOTALL)
+_COLUMN = re.compile(r"^\s{2}(\w+) (\w+)")
+
+
+def schema_columns() -> dict[str, set[str]]:
+    """Column names per table, read from schema.sql (constraint lines are skipped)."""
+    tables: dict[str, set[str]] = {}
+    for name, body in _TABLE.findall(SCHEMA.read_text(encoding="utf-8")):
+        columns = set()
+        for line in body.splitlines():
+            match = _COLUMN.match(line)
+            if match and match.group(1) != "CONSTRAINT":
+                columns.add(match.group(1))
+        tables[name] = columns
+    return tables
+
+
+MAPPED = {mapper.class_.__tablename__: mapper.class_ for mapper in orm.Base.registry.mappers}
+
+
+def test_schema_parser_reads_every_table():
+    assert len(schema_columns()) == 8
+
+
+def test_every_table_of_the_schema_is_mapped():
+    assert set(MAPPED) == set(schema_columns())
+
+
+@pytest.mark.parametrize("table", sorted(MAPPED))
+def test_mapped_columns_match_the_schema(table):
+    mapped = {column.name for column in MAPPED[table].__table__.columns}
+    assert mapped == schema_columns()[table]
+
+
+@pytest.mark.parametrize("table", sorted(MAPPED))
+def test_primary_key_is_the_identity_column(table):
+    keys = [column.name for column in MAPPED[table].__table__.primary_key]
+    assert keys == [f"{table.removesuffix('s')}_id"]
+
+
+def test_camera_ip_and_zone_coordinates_use_postgres_types():
+    assert orm.CameraRow.__table__.c.ip_address.type.__visit_name__ == "INET"
+    assert orm.ZoneRow.__table__.c.coordinates.type.__visit_name__ == "JSONB"
+
+
+def test_instants_are_timezone_aware():
+    for column in (
+        orm.EventRow.__table__.c.occurred_at,
+        orm.AlertRow.__table__.c.created_at,
+        orm.AlertRow.__table__.c.attended_at,
+    ):
+        assert column.type.timezone is True
