@@ -35,11 +35,6 @@ class AlertBoard:
             self._queue.remove(view.id)
             self._history.update(view.id, view)
 
-    def refresh(self, view: EventView) -> None:
-        """The event changed but is still pending. O(1)."""
-        with self._lock:
-            self._history.update(view.id, view)
-
     def pending(self, limit: int) -> list[AlertEntry]:
         """Most urgent pending alerts first. O(limit log limit)."""
         with self._lock:

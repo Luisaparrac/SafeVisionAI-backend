@@ -71,10 +71,10 @@ def test_register_requires_persisted_references():
         Event.register(camera=new_camera, event_type=FALL, occurred_at=NOW)
 
 
-def test_review_then_resolve():
-    event = make_event()
-    event.start_review()
-    assert event.status is EventStatus.IN_REVIEW
+def test_event_in_review_can_be_resolved():
+    # in_review is set by other clients of the shared database.
+    event = make_event(status="in_review")
+    assert event.is_open
     event.resolve()
     assert event.status is EventStatus.RESOLVED
     assert not event.is_open
@@ -86,7 +86,7 @@ def test_mark_false_alarm_directly():
     assert event.status is EventStatus.FALSE_ALARM
 
 
-@pytest.mark.parametrize("action", ["start_review", "resolve", "mark_false_alarm"])
+@pytest.mark.parametrize("action", ["resolve", "mark_false_alarm"])
 def test_closed_event_cannot_change(action):
     event = make_event(status="resolved")
     with pytest.raises(InvalidTransitionError):

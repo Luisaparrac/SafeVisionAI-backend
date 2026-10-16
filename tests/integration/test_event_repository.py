@@ -52,10 +52,10 @@ def test_add_assigns_ids_and_keeps_every_field(repo):
 
 def test_update_persists_changes(repo, session):
     event = repo.add(new_event())
-    event.start_review()
+    event.resolve()
     repo.update(event)
     stored = session.scalar(select(EventRow.status).where(EventRow.event_id == event.id))
-    assert stored == "in_review"
+    assert stored == "resolved"
 
 
 def test_update_of_missing_event_fails(repo):

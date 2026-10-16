@@ -68,9 +68,6 @@ class Event:
     def is_open(self) -> bool:
         return self.status.is_open
 
-    def start_review(self) -> None:
-        self.status = self.status.transition_to(EventStatus.IN_REVIEW)
-
     def resolve(self) -> None:
         self.status = self.status.transition_to(EventStatus.RESOLVED)
 

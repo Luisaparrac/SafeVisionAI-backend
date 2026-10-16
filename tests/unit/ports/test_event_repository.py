@@ -39,9 +39,9 @@ def test_add_assigns_ids_and_get_returns_a_copy(repo):
 
 def test_update_persists_changes(repo):
     event = repo.add(new_event())
-    event.start_review()
+    event.resolve()
     repo.update(event)
-    assert repo.get(event.id).status is EventStatus.IN_REVIEW
+    assert repo.get(event.id).status is EventStatus.RESOLVED
 
 
 def test_update_of_missing_event_fails(repo):
