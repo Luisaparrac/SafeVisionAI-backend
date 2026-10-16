@@ -63,3 +63,16 @@ def register_event(
 def review_event(event_id: int, container: Container = Depends(get_container)) -> EventOut:
     """Marks the event as reviewed and closes its alerts; repeating it changes nothing."""
     return EventOut.from_view(container.review_event.execute(event_id))
+
+
+@router.patch(
+    "/{event_id}/falsa-alarma",
+    response_model=EventOut,
+    responses={409: {"description": "El evento ya fue resuelto"}},
+)
+def mark_false_alarm(event_id: int, container: Container = Depends(get_container)) -> EventOut:
+    """Closes the event as a false alarm and dismisses its alerts; repeating it changes nothing.
+
+    An event already resolved keeps the result of its review (409).
+    """
+    return EventOut.from_view(container.mark_false_alarm.execute(event_id))
