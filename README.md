@@ -1,37 +1,71 @@
 # SafeVision AI — Backend
 
-REST API in Python (FastAPI) for SafeVision AI. Reads and writes events and alerts in the
-team's PostgreSQL database, receives detections from the IoT module, and serves the
-data to the frontend.
+API REST de SafeVision AI, escrita en Python con FastAPI. Recibe las detecciones
+del módulo IoT (cámara con YOLO Pose), las guarda como eventos y alertas en la
+base PostgreSQL del equipo y sirve al panel web los eventos, las alertas
+pendientes en orden de urgencia, métricas, estadísticas y catálogos. Las alertas
+nuevas también llegan al panel en vivo por WebSocket.
 
-## Data structures
+Proyecto del curso **Estructuras de Datos**: la cola de alertas, el historial
+reciente y la ventana de deduplicación usan estructuras implementadas a mano.
 
-| Structure | File | Role in the system |
+## Arquitectura
+
+El código sigue la **arquitectura hexagonal** (puertos y adaptadores) y vive en
+`src/safevision/`. Las dependencias apuntan siempre hacia el centro:
+`adapters → application → domain`.
+
+```
+src/safevision/
+├── domain/          Núcleo puro, sin frameworks
+│   ├── model/       Entidades (Event, Alert, Camera…) y value objects (Severity, EventStatus…)
+│   └── structures/  Heap con índice, lista doble acotada y cola enlazada
+├── application/     Casos de uso, puertos (typing.Protocol) y servicios en memoria
+├── adapters/
+│   ├── inbound/http/        FastAPI: rutas, esquemas, seguridad, WebSocket, middlewares
+│   └── outbound/persistence/ SQLAlchemy: modelos ORM, mappers, repositorios, unidad de trabajo
+├── config/settings.py      Configuración desde variables de entorno (falla al arrancar si falta algo)
+└── bootstrap.py            Raíz de composición: conecta cada puerto con su adaptador
+```
+
+- **domain** no importa FastAPI, Pydantic ni SQLAlchemy; una prueba de
+  arquitectura (`tests/architecture`) lo verifica recorriendo los imports.
+- **application** define lo que necesita del exterior como puertos
+  (`EventRepository`, `UnitOfWork`, `Clock`, `AlertNotifier`, `ReadinessProbe`)
+  y orquesta el dominio en un caso de uso por archivo.
+- **adapters** implementan esos puertos (PostgreSQL, reloj del sistema,
+  WebSocket) y exponen los casos de uso por HTTP.
+
+El detalle, con diagramas, está en [docs/arquitectura.md](docs/arquitectura.md).
+
+## Estructuras de datos
+
+| Estructura | Archivo | Uso |
 |---|---|---|
-| Max-heap priority queue with position index | `src/safevision/domain/structures/alert_priority_queue.py` | Orders pending alerts by severity, then by age. Reviewing an alert removes it in O(log n). |
-| Bounded doubly linked list | `src/safevision/domain/structures/event_history.py` | Recent event history (newest at head). Insert O(1), drop oldest O(1), update by id O(1). |
+| Max-heap con índice de posiciones | `domain/structures/alert_priority_queue.py` | Alertas pendientes: primero la más severa y, si empatan, la más antigua. Quitar la de un evento revisado cuesta O(log n). |
+| Lista doblemente enlazada acotada | `domain/structures/event_history.py` | Historial reciente de eventos (`/api/eventos/recientes`). Insertar, descartar el más antiguo y actualizar por id cuestan O(1). |
+| Cola FIFO enlazada | `domain/structures/linked_queue.py` | Ventana deslizante del deduplicador de detecciones repetidas del IoT. |
 
-The database is the source of truth; both structures are rebuilt from it on startup and
-kept in sync on every create/review.
+La base de datos es la fuente de verdad: estas estructuras son índices en
+memoria que se reconstruyen desde ella al arrancar. La justificación y las
+complejidades están en [docs/estructuras.md](docs/estructuras.md).
 
-## Database
+## Base de datos
 
-The backend connects to the team's PostgreSQL database, whose 8 tables (`users`,
-`locations`, `cameras`, `zones`, `subjects`, `event_types`, `events`, `alerts`) are owned
-by another role. The backend **never creates or alters tables** and inserts no seed data:
-its database user only has SELECT/INSERT/UPDATE/DELETE.
+El backend usa la base PostgreSQL existente del equipo, con 8 tablas (`users`,
+`locations`, `cameras`, `zones`, `subjects`, `event_types`, `events`, `alerts`)
+que pertenecen a otro rol. **Nunca crea, altera ni borra tablas**: su usuario
+solo puede leer y escribir filas. `tests/integration/schema.sql` reproduce la
+estructura (sin datos) para las pruebas y el entorno local.
 
-Database values are in English; the API translates them to the Spanish labels the
-frontend uses:
+Los valores de la base están en inglés; la API los traduce a las etiquetas que
+muestra el panel:
 
-| Database | Frontend |
+| Base de datos | Panel |
 |---|---|
 | `events.status` pending / in_review | Pendiente |
 | `events.status` resolved / false_alarm | Revisado |
 | `event_types.severity_level` 3–4 / 2 / 1 | Alto / Medio / Bajo |
-
-Reviewing an event sets `events.status = 'resolved'` and closes its open alerts
-(`status = 'resolved'`, `attended_at = now()`).
 
 ## Run locally
 
