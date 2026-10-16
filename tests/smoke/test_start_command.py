@@ -20,6 +20,7 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+from websockets.sync.client import connect
 
 pytestmark = pytest.mark.smoke
 
@@ -112,8 +113,13 @@ def test_start_command_serves_the_contract(server):
     status, body = call(server, "POST", "/api/eventos", event)
     assert (status, body) == (401, {"detail": "X-API-Key inválida"})
 
-    status, created = call(server, "POST", "/api/eventos", event, key=KEY)
-    assert status == 201
+    # The live feed works with the WebSocket support of the production server.
+    with connect(server.replace("http://", "ws://") + "/ws/alertas", open_timeout=10) as feed:
+        status, created = call(server, "POST", "/api/eventos", event, key=KEY)
+        assert status == 201
+        message = json.loads(feed.recv(timeout=10))
+    assert message["tipo"] == "alerta_nueva"
+    assert message["alerta"]["event"] == created
     assert (created["type"], created["location"], created["status"]) == (
         "Caída",
         "Casa · Escalera",
