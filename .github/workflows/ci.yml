@@ -80,7 +80,9 @@ jobs:
         run: |
           curl --fail --silent --show-error http://localhost:8000/health
           curl --fail --silent --show-error http://localhost:8000/health/ready
-          types=$(curl --fail --silent --show-error http://localhost:8000/api/tipos-evento)
+          # The catalogs require a session or the IoT key of .env.compose.example.
+          types=$(curl --fail --silent --show-error -H "X-API-Key: dev-only-iot-key" \
+            http://localhost:8000/api/tipos-evento)
           echo "$types" | python3 -c "import json, sys; assert len(json.load(sys.stdin)) == 4"
       - name: The server does not run as root
         run: test "$(docker compose exec -T api id -u)" != "0"

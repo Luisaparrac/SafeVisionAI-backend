@@ -1,5 +1,7 @@
 import pytest
 
+from tests.unit.http.conftest import log_in
+
 KEY = {"X-API-Key": "test-key"}
 
 
@@ -114,6 +116,7 @@ def test_filter_by_dates(client, clock):
     # FakeClock: 2026-10-14 12:00 UTC, 07:00 in Bogotá.
     today = post(client, camera_id=1, event_type_id=3)
     clock.advance(24 * 3600)
+    log_in(client)  # the session of yesterday has expired
     tomorrow = post(client, camera_id=1, event_type_id=3)
     params = {"desde": "2026-10-14", "hasta": "2026-10-14"}
     assert client.get("/api/eventos", params=params).json() == [today]

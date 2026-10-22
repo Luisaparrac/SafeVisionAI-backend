@@ -11,6 +11,12 @@ WRONG = {"detail": "Correo o contraseña incorrectos"}
 PANEL = {"Origin": "http://localhost:5173"}
 
 
+@pytest.fixture
+def client(anonymous):
+    """These tests start without a session."""
+    return anonymous
+
+
 def login(client, email=TEST_EMAIL, password=TEST_PASSWORD):
     return client.post("/api/auth/login", json={"email": email, "password": password})
 

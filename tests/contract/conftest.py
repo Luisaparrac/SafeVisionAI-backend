@@ -12,6 +12,9 @@ Until phase 8 they also ran against the previous application (app/), so the
 expectations here are the behavior the frontend and the IoT module rely on.
 
 Backends that need PostgreSQL are skipped without TEST_DATABASE_URL.
+
+The client is the panel: logged in as the test user of the reference rows and
+sending the Origin of the frontend, as the browser does.
 """
 
 from collections.abc import Iterator
@@ -29,9 +32,10 @@ from safevision.bootstrap import build_container
 from safevision.config.settings import Settings
 from tests.fakes.catalog import seed_reference_catalog
 from tests.fakes.unit_of_work import FakeUnitOfWork
-from tests.fakes.users import FAST_HASHER
+from tests.fakes.users import FAST_HASHER, TEST_EMAIL, TEST_PASSWORD
 
 KEY = {"X-API-Key": "test-key"}
+PANEL_ORIGIN = "http://localhost:5173"
 EVENT_KEYS = {
     "id",
     "type",
@@ -59,7 +63,12 @@ SETTINGS = Settings(
 @contextmanager
 def hexagonal_client(uow: UnitOfWork) -> Iterator[TestClient]:
     container = build_container(SETTINGS, uow, SystemClock(), password_hasher=FAST_HASHER)
-    with TestClient(create_app(container)) as client:  # runs the startup rebuild
+    app = create_app(container)
+    # https: the session cookie is Secure, so the client only sends it back over https.
+    headers = {"Origin": PANEL_ORIGIN}
+    with TestClient(app, base_url="https://testserver", headers=headers) as client:
+        credentials = {"email": TEST_EMAIL, "password": TEST_PASSWORD}
+        assert client.post("/api/auth/login", json=credentials).status_code == 200
         yield client
 
 

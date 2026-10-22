@@ -106,9 +106,11 @@ def server(pg_seeded, tmp_path):
 def test_start_command_serves_the_contract(server):
     assert call(server, "GET", "/health") == (200, {"status": "ok"})
     assert call(server, "GET", "/health/ready") == (200, {"status": "ok", "database": "ok"})
-    assert call(server, "GET", "/api/eventos") == (200, [])
-    assert call(server, "GET", "/api/alertas/pendientes") == (200, [])
-    assert call(server, "GET", "/api/metricas") == (200, {"total": 0, "pendientes": 0, "alto": 0})
+    assert call(server, "GET", "/api/eventos")[0] == 401
+    assert call(server, "GET", "/api/eventos", key=KEY) == (200, [])
+    assert call(server, "GET", "/api/alertas/pendientes", key=KEY) == (200, [])
+    metrics = call(server, "GET", "/api/metricas", key=KEY)
+    assert metrics == (200, {"total": 0, "pendientes": 0, "alto": 0})
 
     event = {"camera_id": 1, "event_type": "Caída", "zone_id": 1}
     status, body = call(server, "POST", "/api/eventos", event)
@@ -126,7 +128,8 @@ def test_start_command_serves_the_contract(server):
         "Casa · Escalera",
         "Pendiente",
     )
-    assert call(server, "GET", "/api/eventos")[1] == [created]
-    status, alerts = call(server, "GET", "/api/alertas/pendientes")
+    assert call(server, "GET", "/api/eventos", key=KEY)[1] == [created]
+    status, alerts = call(server, "GET", "/api/alertas/pendientes", key=KEY)
     assert [alert["event"] for alert in alerts] == [created]
-    assert call(server, "GET", "/api/metricas")[1] == {"total": 1, "pendientes": 1, "alto": 1}
+    metrics = call(server, "GET", "/api/metricas", key=KEY)[1]
+    assert metrics == {"total": 1, "pendientes": 1, "alto": 1}

@@ -52,7 +52,9 @@ def main(argv: Sequence[str], environ: Mapping[str, str]) -> None:
     args = parse_args(argv, environ)
 
     def get(path: str):
-        with urllib.request.urlopen(args.url + path, timeout=90) as response:
+        # The catalogs require a panel session or the IoT key.
+        request = urllib.request.Request(args.url + path, headers={"X-API-Key": args.key})
+        with urllib.request.urlopen(request, timeout=90) as response:
             return json.loads(response.read())
 
     camera_id = args.camara or get("/api/camaras")[0]["camera_id"]

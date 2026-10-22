@@ -11,6 +11,11 @@ from safevision.adapters.inbound.http.sessions import SESSION, SESSION_COOKIE
 from safevision.application.dto import UserView
 
 NOT_AUTHENTICATED = "Inicia sesión para continuar"
+# Documented on every /api router.
+AUTH_RESPONSES: dict[int | str, dict] = {
+    401: {"description": "Sin sesión válida ni X-API-Key válida"},
+    403: {"description": "Cambio con cookie enviado desde un origen no permitido"},
+}
 UNTRUSTED_ORIGIN = "Origen no permitido"
 # Methods that change data. Browsers send cookies with them from any site, so
 # their origin is checked; GET and HEAD only read and cannot be read cross-site.
@@ -26,9 +31,12 @@ def require_iot_key(
     The comparison takes constant time, so the key cannot be guessed from how
     long the answer takes.
     """
-    provided = (x_api_key or "").encode()
-    if not hmac.compare_digest(provided, container.iot_api_key.encode()):
+    if not _key_matches(x_api_key, container):
         raise HTTPException(401, "X-API-Key inválida")
+
+
+def _key_matches(provided: str | None, container: Container) -> bool:
+    return hmac.compare_digest((provided or "").encode(), container.iot_api_key.encode())
 
 
 def session_user(request: Request, container: Container) -> UserView | None:
@@ -44,6 +52,23 @@ def require_session(request: Request, container: Container = Depends(get_contain
     if user is None:
         raise HTTPException(401, NOT_AUTHENTICATED)
     return user
+
+
+def require_panel_access(
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+    container: Container = Depends(get_container),
+) -> None:
+    """Routes of the panel: a valid session cookie, or the X-API-Key of the IoT module.
+
+    The key lets the IoT module and the scripts read the catalogs. A request with
+    a valid key skips the origin check: browsers never add that header on their
+    own, so another site cannot make one carry it.
+    """
+    if x_api_key is not None and _key_matches(x_api_key, container):
+        return
+    require_session(request, container)
+    ensure_trusted_origin(request, container)
 
 
 def ensure_trusted_origin(request: Request, container: Container) -> None:

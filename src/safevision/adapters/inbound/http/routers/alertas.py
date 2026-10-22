@@ -5,8 +5,14 @@ from fastapi import APIRouter, Depends, Query
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
 from safevision.adapters.inbound.http.schemas import AlertOut, MetricsOut
+from safevision.adapters.inbound.http.security import AUTH_RESPONSES, require_panel_access
 
-router = APIRouter(prefix="/api", tags=["alertas"])
+router = APIRouter(
+    prefix="/api",
+    tags=["alertas"],
+    dependencies=[Depends(require_panel_access)],
+    responses=AUTH_RESPONSES,
+)
 
 
 @router.get("/alertas/pendientes", response_model=list[AlertOut])
