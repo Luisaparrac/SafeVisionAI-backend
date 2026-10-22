@@ -24,7 +24,8 @@ def test_unreachable_database_answers_503(pg_engine):
     )
     uow = SqlAlchemyUnitOfWork(make_session_factory(engine))
     client = TestClient(create_app(build_container(settings, uow, SystemClock())))
-    response = client.get("/api/eventos")  # without the startup rebuild, which would fail
+    # Without the startup rebuild, which would fail; the key needs no database.
+    response = client.get("/api/eventos", headers={"X-API-Key": "k"})
     assert response.status_code == 503
     assert response.json() == {
         "detail": "La base de datos no está disponible. Intenta de nuevo más tarde."

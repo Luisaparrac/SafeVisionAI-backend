@@ -29,7 +29,9 @@ def client(pg_clean):
         session_secret="test-session-secret-0123456789abcdef",
     )
     uow = SqlAlchemyUnitOfWork(make_session_factory(pg_clean))
-    with TestClient(create_app(build_container(settings, uow, SystemClock()))) as client:
+    app = create_app(build_container(settings, uow, SystemClock()))
+    # The sample user has no valid password hash; the IoT key also reads the panel routes.
+    with TestClient(app, headers={"X-API-Key": "k"}) as client:
         yield client
 
 
