@@ -12,6 +12,7 @@ alerts_feed
 by_event_type
 by_camera
 login
+me
 
 # Pydantic reads these class attributes to build and serialize the models.
 model_config

@@ -82,3 +82,52 @@ def test_openapi_describes_the_login(client):
     operation = client.get("/openapi.json").json()["paths"]["/api/auth/login"]["post"]
     assert operation["summary"] == "Iniciar sesión"
     assert "401" in operation["responses"]
+
+
+def test_me_returns_the_session_user(client):
+    login(client)
+    response = client.get("/api/auth/me")
+    assert response.status_code == 200
+    assert response.json() == SESSION_BODY
+
+
+def test_me_without_a_session(client):
+    response = client.get("/api/auth/me")
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Inicia sesión para continuar"}
+
+
+def test_me_with_a_forged_cookie(client):
+    token = login(client).cookies[SESSION_COOKIE]
+    client.cookies.clear()
+    client.cookies.set(SESSION_COOKIE, token[:-2] + "xx")
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_session_expires_after_its_lifetime(client, clock):
+    login(client)
+    clock.advance(8 * 3600 - 1)
+    assert client.get("/api/auth/me").status_code == 200
+    clock.advance(1)
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_session_ends_when_the_user_is_removed(client, uow):
+    login(client)
+    uow.users._rows.pop(1)
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_cookie_is_not_sent_over_plain_http(container):
+    from fastapi.testclient import TestClient
+
+    from safevision.adapters.inbound.http.app import create_app
+
+    with TestClient(create_app(container)) as plain:  # http://testserver
+        assert login(plain).status_code == 200
+        assert plain.get("/api/auth/me").status_code == 401
+
+
+def test_openapi_describes_the_session_route(client):
+    operation = client.get("/openapi.json").json()["paths"]["/api/auth/me"]["get"]
+    assert operation["summary"] == "Usuario actual de la sesión"

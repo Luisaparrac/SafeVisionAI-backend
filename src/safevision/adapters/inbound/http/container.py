@@ -14,6 +14,7 @@ from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
+from safevision.application.use_cases.get_session_user import GetSessionUser
 from safevision.application.use_cases.get_statistics import (
     GetCameraStatistics,
     GetEventTypeStatistics,
@@ -59,3 +60,4 @@ class Container:
     list_zones: ListZones
     list_subjects: ListSubjects
     authenticate_user: AuthenticateUser
+    get_session_user: GetSessionUser
