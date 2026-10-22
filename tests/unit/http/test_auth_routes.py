@@ -131,3 +131,28 @@ def test_cookie_is_not_sent_over_plain_http(container):
 def test_openapi_describes_the_session_route(client):
     operation = client.get("/openapi.json").json()["paths"]["/api/auth/me"]["get"]
     assert operation["summary"] == "Usuario actual de la sesión"
+
+
+def test_logout_expires_the_cookie(client):
+    login(client)
+    response = client.post("/api/auth/logout")
+    assert response.status_code == 204
+    assert response.content == b""
+    header = response.headers["set-cookie"]
+    assert header.startswith(f'{SESSION_COOKIE}="";')
+    assert "Max-Age=0" in header
+    assert {"HttpOnly", "Secure", "Path=/", "SameSite=none"} <= {
+        part.strip() for part in header.split(";")
+    }
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_logout_is_idempotent(client):
+    assert client.post("/api/auth/logout").status_code == 204
+    assert client.post("/api/auth/logout").status_code == 204
+
+
+def test_openapi_describes_the_logout(client):
+    operation = client.get("/openapi.json").json()["paths"]["/api/auth/logout"]["post"]
+    assert operation["summary"] == "Cerrar sesión"
+    assert "204" in operation["responses"]

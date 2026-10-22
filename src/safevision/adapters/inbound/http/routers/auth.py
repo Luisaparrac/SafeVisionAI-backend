@@ -43,3 +43,16 @@ def login(
 def me(user: UserView = Depends(require_session)) -> SessionOut:
     """The panel calls it on load to know whether it must show the login form."""
     return SessionOut.from_view(user)
+
+
+@router.post(
+    "/logout",
+    status_code=204,
+    response_class=Response,
+    summary="Cerrar sesión",
+)
+def logout(container: Container = Depends(get_container)) -> Response:
+    """Expires the session cookie. Works without a session too, so repeating it is harmless."""
+    response = Response(status_code=204)
+    container.sessions.end(response)
+    return response

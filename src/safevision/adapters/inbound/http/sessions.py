@@ -89,3 +89,13 @@ class SessionPolicy:
             httponly=True,
             samesite=self.same_site,
         )
+
+    def end(self, response: Response) -> None:
+        """Expires the cookie in the browser, with the same attributes it was set with."""
+        response.delete_cookie(
+            SESSION_COOKIE,
+            path="/",
+            secure=True,
+            httponly=True,
+            samesite=self.same_site,
+        )
