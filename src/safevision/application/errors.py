@@ -34,3 +34,12 @@ class InvalidCredentialsError(Exception):
 
     def __init__(self) -> None:
         super().__init__(self.message)
+
+
+class TooManyLoginAttemptsError(Exception):
+    """Too many failed logins for one e-mail in a short time."""
+
+    message = "Demasiados intentos fallidos. Intenta de nuevo en unos minutos."
+
+    def __init__(self) -> None:
+        super().__init__(self.message)

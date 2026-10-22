@@ -16,6 +16,7 @@ from safevision.application.errors import (
     PersistenceError,
     StorageConflictError,
     StorageUnavailableError,
+    TooManyLoginAttemptsError,
 )
 from safevision.domain.errors import (
     DomainError,
@@ -65,6 +66,11 @@ async def invalid_credentials_handler(_: Request, error: Exception) -> JSONRespo
     return JSONResponse(status_code=401, content={"detail": error.message})
 
 
+async def too_many_attempts_handler(_: Request, error: Exception) -> JSONResponse:
+    assert isinstance(error, TooManyLoginAttemptsError)
+    return JSONResponse(status_code=429, content={"detail": error.message})
+
+
 async def unexpected_error_handler(_: Request, error: Exception) -> JSONResponse:
     logger.error("unexpected error: %s", type(error).__name__)
     return JSONResponse(status_code=500, content={"detail": INTERNAL_ERROR_MESSAGE})
@@ -74,4 +80,5 @@ def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, domain_error_handler)
     app.add_exception_handler(PersistenceError, persistence_error_handler)
     app.add_exception_handler(InvalidCredentialsError, invalid_credentials_handler)
+    app.add_exception_handler(TooManyLoginAttemptsError, too_many_attempts_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)

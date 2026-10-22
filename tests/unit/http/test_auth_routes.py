@@ -156,3 +156,14 @@ def test_openapi_describes_the_logout(client):
     operation = client.get("/openapi.json").json()["paths"]["/api/auth/logout"]["post"]
     assert operation["summary"] == "Cerrar sesión"
     assert "204" in operation["responses"]
+
+
+def test_too_many_failures_answer_429(client):
+    for _ in range(5):
+        assert login(client, password="mala").status_code == 401
+    response = login(client)
+    assert response.status_code == 429
+    assert response.json() == {
+        "detail": "Demasiados intentos fallidos. Intenta de nuevo en unos minutos."
+    }
+    assert SESSION_COOKIE not in response.cookies

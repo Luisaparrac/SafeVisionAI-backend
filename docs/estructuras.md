@@ -277,6 +277,52 @@ reloj se inyecta, así las pruebas controlan el tiempo con un reloj falso.
 
 ---
 
+## 5. Límite de intentos de inicio de sesión: cola + diccionario
+
+Archivo: `application/services/login_throttle.py` (`LoginThrottle`).
+
+### Problema
+
+Sin límite, cualquiera podría probar contraseñas una tras otra contra un
+correo. Un correo con **5 intentos fallidos en los últimos 15 minutos** queda
+bloqueado (`POST /api/auth/login` responde 429) hasta que el más antiguo de
+esos fallos cumple 15 minutos. Un inicio de sesión correcto borra su cuenta.
+
+### Representación
+
+La misma idea que el deduplicador:
+
+- una `LinkedQueue` con ternas `(correo, generación, instante)` de cada fallo,
+  **en orden de llegada**;
+- un diccionario `correo → (generación, fallos)` con los fallos de cada
+  correo que siguen dentro de la ventana.
+
+```
+cola:        [(a, 1, 10:00)] → [(b, 2, 10:03)] → [(a, 1, 10:07)]
+diccionario: {a: (1, 2), b: (2, 1)}
+```
+
+### Operaciones
+
+| Operación | Tiempo | Cómo funciona |
+|---|---|---|
+| `is_blocked(correo)` | O(1) amortizado | Expira lo vencido y compara los fallos del correo con el máximo. |
+| `record_failure(correo)` | O(1) amortizado | Expira, suma un fallo en el diccionario y encola. |
+| `clear(correo)` | O(1) | Borra el correo del diccionario. |
+| `_expire(ahora)` | O(1) amortizado | Desencola los fallos vencidos del frente y resta uno al correo; si llega a cero, lo borra. |
+
+Espacio: O(fallos dentro de la ventana). Un correo que deja de fallar
+desaparece solo, así que la memoria no crece con correos inventados.
+
+**Generaciones.** `clear` no recorre la cola: deja allí los fallos viejos.
+Cada cuenta nueva recibe un número de generación distinto, y cuando esos
+fallos viejos vencen ya no coinciden con el diccionario y se descartan.
+
+El estado vive en memoria: es por proceso y empieza vacío al reiniciar, lo
+que basta para la única instancia del servicio.
+
+---
+
 ## Resumen de complejidades
 
 | Estructura | Operación | Tiempo | Espacio |
@@ -288,3 +334,5 @@ reloj se inyecta, así las pruebas controlan el tiempo con un reloj falso.
 | | newest(limit) | O(limit) | |
 | Cola enlazada | enqueue / dequeue / peek | O(1) | O(n) |
 | Deduplicador | find_recent / remember | O(1) amortizado | O(ventana) |
+| Límite de inicios de sesión | is_blocked / record_failure | O(1) amortizado | O(fallos en la ventana) |
+| | clear | O(1) | |

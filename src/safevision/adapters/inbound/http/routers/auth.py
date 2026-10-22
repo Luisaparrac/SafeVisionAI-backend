@@ -19,7 +19,10 @@ router = APIRouter(prefix="/api/auth", tags=["autenticación"])
     "/login",
     response_model=SessionOut,
     summary="Iniciar sesión",
-    responses={401: {"description": "Correo o contraseña incorrectos"}},
+    responses={
+        401: {"description": "Correo o contraseña incorrectos"},
+        429: {"description": "5 intentos fallidos con ese correo en 15 minutos"},
+    },
 )
 def login(
     data: LoginIn, response: Response, container: Container = Depends(get_container)
@@ -27,7 +30,8 @@ def login(
     """Checks the credentials and opens a session cookie (HttpOnly, Secure).
 
     The e-mail is compared in lower case. Any failure answers 401 with the same
-    message, whether the e-mail exists or not.
+    message, whether the e-mail exists or not. After 5 failures with one e-mail
+    in 15 minutes that e-mail gets 429 until the oldest failure is 15 minutes old.
     """
     user = container.authenticate_user.execute(data.email, data.password)
     container.sessions.start(response, user.id)

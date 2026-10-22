@@ -17,6 +17,7 @@ from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.application.presenter import EventPresenter
 from safevision.application.services.alert_board import AlertBoard
 from safevision.application.services.event_deduplicator import EventDeduplicator
+from safevision.application.services.login_throttle import LoginThrottle
 from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
@@ -94,7 +95,7 @@ def build_container(
         update_camera_status=UpdateCameraStatus(uow),
         list_zones=ListZones(uow),
         list_subjects=ListSubjects(uow),
-        authenticate_user=AuthenticateUser(uow, hasher),
+        authenticate_user=AuthenticateUser(uow, hasher, LoginThrottle(clock.now)),
         get_session_user=GetSessionUser(uow),
     )
 
