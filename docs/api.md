@@ -45,6 +45,7 @@ Forma de cada evento en todas las respuestas:
   "camera": "Sala",
   "date": "2026-10-14",
   "time": "07:05:31",
+  "occurred_at": "2026-10-14T07:05:31-05:00",
   "priority": "Alto",
   "status": "Pendiente",
   "description": "Persona en el piso"
@@ -57,6 +58,7 @@ Forma de cada evento en todas las respuestas:
 | `subject` | Nombre del sujeto o, si no se identificó, la clase detectada: "Persona sin identificar", "Perro sin identificar", "Gato sin identificar", "Animal sin identificar" |
 | `location` | Ubicación de la cámara y, si hay zona, " · " y el nombre de la zona |
 | `date`, `time` | Fecha (`AAAA-MM-DD`) y hora (`HH:MM:SS`) en `TIMEZONE` |
+| `occurred_at` | El mismo instante en ISO 8601 con la zona de `TIMEZONE` (por ejemplo `2026-10-14T07:05:31-05:00`) |
 | `priority` | `Alto` (severidad 3–4), `Medio` (2) o `Bajo` (1) |
 | `status` | `Pendiente` (pending, in_review) o `Revisado` (resolved, false_alarm) |
 

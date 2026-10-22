@@ -29,6 +29,7 @@ class EventOut(BaseModel):
     camera: str
     date: str
     time: str
+    occurred_at: str = Field(description="Instante ISO 8601 con zona, en TIMEZONE")
     priority: str = Field(description="Alto, Medio o Bajo")
     status: str = Field(description="Pendiente o Revisado")
     description: str | None = None

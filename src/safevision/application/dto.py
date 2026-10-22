@@ -15,6 +15,7 @@ class EventView:
     camera: str
     date: str  # local date, ISO format
     time: str  # local time, HH:MM:SS
+    occurred_at: str  # ISO 8601 instant with the offset of the local time zone
     priority: str  # Alto / Medio / Bajo
     status: str  # Pendiente / Revisado
     description: str | None

@@ -16,7 +16,8 @@ def test_register_minimal_event(client):
     assert set(event) == EVENT_KEYS
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", event["date"])
     assert re.fullmatch(r"\d{2}:\d{2}:\d{2}", event["time"])
-    assert {k: v for k, v in event.items() if k not in ("date", "time")} == {
+    assert event["occurred_at"] == f"{event['date']}T{event['time']}-05:00"
+    assert {k: v for k, v in event.items() if k not in ("date", "time", "occurred_at")} == {
         "id": 1,
         "type": "Caída",
         "subject": "Persona sin identificar",

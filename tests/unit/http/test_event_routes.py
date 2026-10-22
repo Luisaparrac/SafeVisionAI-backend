@@ -20,6 +20,7 @@ def test_register_uses_the_clock_in_the_configured_time_zone(client):
     # FakeClock starts at 12:00 UTC, which is 07:00 in Bogotá.
     created = post(client, camera_id=1, event_type_id=1)
     assert (created["date"], created["time"]) == ("2026-10-14", "07:00:00")
+    assert created["occurred_at"] == "2026-10-14T07:00:00-05:00"
 
 
 def test_register_requires_the_key(client):

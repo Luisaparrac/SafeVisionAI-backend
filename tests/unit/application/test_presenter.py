@@ -25,6 +25,7 @@ def test_full_view_with_local_time(uow, presenter):
         camera="Sala",
         date="2026-10-13",
         time="22:30:15",
+        occurred_at="2026-10-13T22:30:15-05:00",
         priority="Alto",
         status="Pendiente",
         description="Se cayó",

@@ -39,6 +39,7 @@ EVENT_KEYS = {
     "camera",
     "date",
     "time",
+    "occurred_at",
     "priority",
     "status",
     "description",

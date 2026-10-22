@@ -20,6 +20,7 @@ VIEW = EventView(
     camera="Sala",
     date="2026-10-14",
     time="07:00:00",
+    occurred_at="2026-10-14T07:00:00-05:00",
     priority="Alto",
     status="Pendiente",
     description=None,
