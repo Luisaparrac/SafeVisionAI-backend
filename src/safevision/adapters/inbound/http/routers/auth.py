@@ -8,9 +8,13 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
-from safevision.adapters.inbound.http.schemas import LoginIn, SessionOut
+from safevision.adapters.inbound.http.schemas import LoginIn, SessionOut, WsTicketOut
 from safevision.adapters.inbound.http.security import ensure_trusted_origin, require_session
-from safevision.adapters.inbound.http.sessions import SESSION_COOKIE
+from safevision.adapters.inbound.http.sessions import (
+    SESSION_COOKIE,
+    WS_TICKET,
+    WS_TICKET_LIFETIME,
+)
 from safevision.application.dto import UserView
 
 router = APIRouter(prefix="/api/auth", tags=["autenticación"])
@@ -67,3 +71,21 @@ def logout(request: Request, container: Container = Depends(get_container)) -> R
     response = Response(status_code=204)
     container.sessions.end(response)
     return response
+
+
+@router.get(
+    "/ws-ticket",
+    response_model=WsTicketOut,
+    summary="Ticket para el WebSocket de alertas",
+    responses={401: {"description": "Sin sesión, sesión expirada o usuario eliminado"}},
+)
+def ws_ticket(
+    user: UserView = Depends(require_session), container: Container = Depends(get_container)
+) -> WsTicketOut:
+    """Signed ticket, valid for 60 seconds, to open /ws/alertas?ticket=... .
+
+    Useful when the browser does not send the cookie with the WebSocket. It only
+    opens the feed: it is not accepted as a session anywhere else.
+    """
+    ticket = container.sessions.signer.issue(user.id, WS_TICKET, WS_TICKET_LIFETIME)
+    return WsTicketOut(ticket=ticket, expires_in=int(WS_TICKET_LIFETIME.total_seconds()))

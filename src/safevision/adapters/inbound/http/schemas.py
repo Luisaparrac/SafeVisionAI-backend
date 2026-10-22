@@ -251,3 +251,8 @@ class SessionOut(BaseModel):
     @classmethod
     def from_view(cls, view: UserView) -> "SessionOut":
         return cls(user=UserOut(id=view.id, name=view.name, email=view.email))
+
+
+class WsTicketOut(BaseModel):
+    ticket: str = Field(description="Se envía como /ws/alertas?ticket=...")
+    expires_in: int = Field(description="Segundos de validez")

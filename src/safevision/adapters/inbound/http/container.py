@@ -4,10 +4,12 @@ The composition root (``safevision.bootstrap``) builds it; the routers only
 read it from the application state, so they never create infrastructure.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from safevision.adapters.inbound.http.sessions import SessionPolicy
-from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 from safevision.application.ports.readiness import ReadinessProbe
 from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.application.use_cases.get_event import GetEvent
@@ -31,6 +33,11 @@ from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoa
 from safevision.application.use_cases.register_event import RegisterEvent
 from safevision.application.use_cases.review_event import ReviewEvent
 from safevision.application.use_cases.update_camera_status import UpdateCameraStatus
+
+if TYPE_CHECKING:
+    # Only a type: the WebSocket endpoint uses the security checks, which read the
+    # container, so importing the module here would be circular.
+    from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 
 
 @dataclass(frozen=True, kw_only=True)

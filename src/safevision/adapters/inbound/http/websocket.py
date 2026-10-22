@@ -6,6 +6,10 @@ WebSocket client lives in the event loop; every client has a bounded queue
 fed with ``call_soon_threadsafe``, so publishing never blocks a request. A
 client too slow to empty its queue loses messages instead of slowing others.
 
+Clients authenticate with a ticket, the IoT key or the session cookie (see
+``security.websocket_allowed``). Any other connection is accepted and closed at
+once with code 4401, so the page can tell it apart from a network failure.
+
 Messages (JSON, Spanish keys like the rest of the API):
 
 * ``{"tipo": "alerta_nueva", "alerta": <AlertOut>}`` when an alert is raised;
@@ -22,8 +26,10 @@ import logging
 import threading
 
 from fastapi import APIRouter, WebSocket
+from starlette.concurrency import run_in_threadpool
 
 from safevision.adapters.inbound.http.schemas import AlertOut, EventOut
+from safevision.adapters.inbound.http.security import websocket_allowed
 from safevision.application.dto import NEW_ALERT, AlertNotification
 
 logger = logging.getLogger(__name__)
@@ -31,6 +37,8 @@ logger = logging.getLogger(__name__)
 QUEUE_SIZE = 100
 KEEPALIVE_SECONDS = 25.0
 PING = {"tipo": "ping"}
+# Private range of WebSocket close codes (4000-4999), mirroring HTTP 401.
+UNAUTHORIZED = 4401
 
 
 def to_message(notification: AlertNotification) -> dict:
@@ -85,8 +93,12 @@ router = APIRouter()
 
 @router.websocket("/ws/alertas")
 async def alerts_feed(websocket: WebSocket) -> None:
-    broadcaster: AlertBroadcaster = websocket.app.state.container.alert_broadcaster
+    container = websocket.app.state.container
     await websocket.accept()
+    if not await run_in_threadpool(websocket_allowed, websocket, container):
+        await websocket.close(code=UNAUTHORIZED, reason="No autenticado")
+        return
+    broadcaster: AlertBroadcaster = container.alert_broadcaster
     queue = broadcaster.subscribe()
     sender = asyncio.create_task(_forward(queue, websocket))
     receiver = asyncio.create_task(_until_disconnect(websocket))

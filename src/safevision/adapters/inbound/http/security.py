@@ -1,13 +1,14 @@
 """Protection of the endpoints: X-API-Key for the IoT module, session cookie for the panel."""
 
 import hmac
+from collections.abc import Mapping
 from urllib.parse import urlsplit
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request, WebSocket
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
-from safevision.adapters.inbound.http.sessions import SESSION, SESSION_COOKIE
+from safevision.adapters.inbound.http.sessions import SESSION, SESSION_COOKIE, WS_TICKET
 from safevision.application.dto import UserView
 
 NOT_AUTHENTICATED = "Inicia sesión para continuar"
@@ -80,16 +81,16 @@ def ensure_trusted_origin(request: Request, container: Container) -> None:
     server over http even when the browser used https. A request with neither
     header is rejected, because browsers always send ``Origin`` on these methods.
     """
-    if request.method not in UNSAFE_METHODS:
-        return
-    origin = request.headers.get("origin") or _origin_of(request.headers.get("referer"))
-    if origin is not None:
-        origin = origin.rstrip("/")
-        if origin in container.cors_origins:
-            return
-        if urlsplit(origin).netloc == request.headers.get("host"):
-            return
-    raise HTTPException(403, UNTRUSTED_ORIGIN)
+    if request.method in UNSAFE_METHODS and not _trusted_origin(request.headers, container):
+        raise HTTPException(403, UNTRUSTED_ORIGIN)
+
+
+def _trusted_origin(headers: Mapping[str, str], container: Container) -> bool:
+    origin = headers.get("origin") or _origin_of(headers.get("referer"))
+    if origin is None:
+        return False
+    origin = origin.rstrip("/")
+    return origin in container.cors_origins or urlsplit(origin).netloc == headers.get("host")
 
 
 def _origin_of(url: str | None) -> str | None:
@@ -97,3 +98,27 @@ def _origin_of(url: str | None) -> str | None:
         return None
     parts = urlsplit(url)
     return f"{parts.scheme}://{parts.netloc}" if parts.scheme and parts.netloc else None
+
+
+def websocket_allowed(websocket: WebSocket, container: Container) -> bool:
+    """Whether a client may open the live alert feed. Any one of these is enough:
+
+    * ``?ticket=`` from GET /api/auth/ws-ticket, for pages that cannot send the
+      cookie (another site, Safari); it lasts 60 seconds;
+    * the X-API-Key header of the IoT module;
+    * the session cookie, from a trusted origin: browsers send it with WebSocket
+      handshakes from any site, and CORS does not apply to them.
+
+    With a ticket or a cookie the user must still exist. It reads the database,
+    so the endpoint runs it in a worker thread.
+    """
+    ticket = websocket.query_params.get("ticket")
+    user_id = None if not ticket else container.sessions.signer.read(ticket, WS_TICKET)
+    if user_id is None:
+        provided = websocket.headers.get("x-api-key")
+        if provided is not None and _key_matches(provided, container):
+            return True
+        token = websocket.cookies.get(SESSION_COOKIE)
+        if token and _trusted_origin(websocket.headers, container):
+            user_id = container.sessions.signer.read(token, SESSION)
+    return user_id is not None and container.get_session_user.execute(user_id) is not None

@@ -117,7 +117,8 @@ def test_start_command_serves_the_contract(server):
     assert (status, body) == (401, {"detail": "X-API-Key inválida"})
 
     # The live feed works with the WebSocket support of the production server.
-    with connect(server.replace("http://", "ws://") + "/ws/alertas", open_timeout=10) as feed:
+    feed_url = server.replace("http://", "ws://") + "/ws/alertas"
+    with connect(feed_url, additional_headers={"X-API-Key": KEY}, open_timeout=10) as feed:
         status, created = call(server, "POST", "/api/eventos", event, key=KEY)
         assert status == 201
         message = json.loads(feed.recv(timeout=10))

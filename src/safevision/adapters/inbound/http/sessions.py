@@ -1,4 +1,4 @@
-"""Signed tokens of the panel: the session cookie and, later, short-lived tickets.
+"""Signed tokens of the panel: the session cookie and the WebSocket ticket.
 
 A token is ``<payload>.<signature>``, both base64url without padding. The
 payload is JSON with the user id (``sub``), the purpose (``pur``), and the
@@ -24,6 +24,9 @@ from fastapi import Response
 
 SESSION_COOKIE = "sv_session"
 SESSION = "session"
+# Ticket that a browser page passes in the URL of the WebSocket (see security).
+WS_TICKET = "ws"
+WS_TICKET_LIFETIME = timedelta(seconds=60)
 
 
 class TokenSigner:

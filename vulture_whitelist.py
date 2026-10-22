@@ -14,6 +14,7 @@ by_camera
 login
 me
 logout
+ws_ticket
 
 # Pydantic reads these class attributes to build and serialize the models.
 model_config
@@ -22,6 +23,7 @@ nivel
 pendientes
 alto
 authenticated
+expires_in
 
 # Parameters of protocol (port) methods and of __exit__, which only declare a signature.
 exc_type
