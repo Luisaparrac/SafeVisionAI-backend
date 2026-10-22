@@ -1,6 +1,7 @@
 """Protection of the endpoints: X-API-Key for the IoT module, session cookie for the panel."""
 
 import hmac
+from urllib.parse import urlsplit
 
 from fastapi import Depends, Header, HTTPException, Request
 
@@ -10,6 +11,10 @@ from safevision.adapters.inbound.http.sessions import SESSION, SESSION_COOKIE
 from safevision.application.dto import UserView
 
 NOT_AUTHENTICATED = "Inicia sesión para continuar"
+UNTRUSTED_ORIGIN = "Origen no permitido"
+# Methods that change data. Browsers send cookies with them from any site, so
+# their origin is checked; GET and HEAD only read and cannot be read cross-site.
+UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def require_iot_key(
@@ -39,3 +44,31 @@ def require_session(request: Request, container: Container = Depends(get_contain
     if user is None:
         raise HTTPException(401, NOT_AUTHENTICATED)
     return user
+
+
+def ensure_trusted_origin(request: Request, container: Container) -> None:
+    """Rejects with 403 a cookie-authenticated change sent from another site (CSRF).
+
+    The ``Origin`` header (or, if missing, the origin of ``Referer``) must be one
+    of FRONTEND_ORIGINS or the backend itself (the /docs page). The backend is
+    recognized by its host only: behind the hosting proxy the request reaches the
+    server over http even when the browser used https. A request with neither
+    header is rejected, because browsers always send ``Origin`` on these methods.
+    """
+    if request.method not in UNSAFE_METHODS:
+        return
+    origin = request.headers.get("origin") or _origin_of(request.headers.get("referer"))
+    if origin is not None:
+        origin = origin.rstrip("/")
+        if origin in container.cors_origins:
+            return
+        if urlsplit(origin).netloc == request.headers.get("host"):
+            return
+    raise HTTPException(403, UNTRUSTED_ORIGIN)
+
+
+def _origin_of(url: str | None) -> str | None:
+    if not url:
+        return None
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}" if parts.scheme and parts.netloc else None

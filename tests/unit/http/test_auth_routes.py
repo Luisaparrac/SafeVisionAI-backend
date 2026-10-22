@@ -8,6 +8,7 @@ SESSION_BODY = {
     "user": {"id": 1, "name": TEST_NAME, "email": TEST_EMAIL},
 }
 WRONG = {"detail": "Correo o contraseña incorrectos"}
+PANEL = {"Origin": "http://localhost:5173"}
 
 
 def login(client, email=TEST_EMAIL, password=TEST_PASSWORD):
@@ -135,7 +136,7 @@ def test_openapi_describes_the_session_route(client):
 
 def test_logout_expires_the_cookie(client):
     login(client)
-    response = client.post("/api/auth/logout")
+    response = client.post("/api/auth/logout", headers=PANEL)
     assert response.status_code == 204
     assert response.content == b""
     header = response.headers["set-cookie"]
@@ -167,3 +168,11 @@ def test_too_many_failures_answer_429(client):
         "detail": "Demasiados intentos fallidos. Intenta de nuevo en unos minutos."
     }
     assert SESSION_COOKIE not in response.cookies
+
+
+def test_logout_with_a_cookie_from_another_site_is_refused(client):
+    login(client)
+    response = client.post("/api/auth/logout", headers={"Origin": "https://evil.example"})
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Origen no permitido"}
+    assert client.get("/api/auth/me").status_code == 200

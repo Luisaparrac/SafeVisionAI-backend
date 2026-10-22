@@ -4,12 +4,13 @@ The session travels in the ``sv_session`` cookie (see ``sessions``); the
 browser keeps it and sends it back, so the panel never handles the token.
 """
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
 from safevision.adapters.inbound.http.schemas import LoginIn, SessionOut
-from safevision.adapters.inbound.http.security import require_session
+from safevision.adapters.inbound.http.security import ensure_trusted_origin, require_session
+from safevision.adapters.inbound.http.sessions import SESSION_COOKIE
 from safevision.application.dto import UserView
 
 router = APIRouter(prefix="/api/auth", tags=["autenticación"])
@@ -54,9 +55,15 @@ def me(user: UserView = Depends(require_session)) -> SessionOut:
     status_code=204,
     response_class=Response,
     summary="Cerrar sesión",
+    responses={403: {"description": "Petición con cookie enviada desde un origen no permitido"}},
 )
-def logout(container: Container = Depends(get_container)) -> Response:
-    """Expires the session cookie. Works without a session too, so repeating it is harmless."""
+def logout(request: Request, container: Container = Depends(get_container)) -> Response:
+    """Expires the session cookie. Works without a session too, so repeating it is harmless.
+
+    With a cookie the origin is checked, so another site cannot end the session.
+    """
+    if SESSION_COOKIE in request.cookies:
+        ensure_trusted_origin(request, container)
     response = Response(status_code=204)
     container.sessions.end(response)
     return response
