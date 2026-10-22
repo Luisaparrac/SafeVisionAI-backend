@@ -74,6 +74,8 @@ reglas del negocio:
 | Puerto | Qué abstrae | Adaptador en producción | Adaptador en pruebas |
 |---|---|---|---|
 | `EventRepository`, `AlertRepository`, `EventTypeRepository`, `CameraRepository`, `CatalogRepository` | Lectura y escritura de cada agregado | Repositorios SQLAlchemy | Repositorios en memoria (`tests/fakes`) |
+| `UserRepository` | Usuarios del panel (solo lectura, por id y por correo) | `SqlAlchemyUserRepository` | `InMemoryUserRepository` |
+| `PasswordHasher` | Cómo se guardan y verifican las contraseñas | `Pbkdf2PasswordHasher` (600 000 iteraciones) | El mismo con pocas iteraciones |
 | `UnitOfWork` | Transacción que agrupa los repositorios | `SqlAlchemyUnitOfWork` (una sesión por hilo) | `FakeUnitOfWork` con rollback real |
 | `Clock` | La hora actual | `SystemClock` (UTC) | `FakeClock` controlable |
 | `AlertNotifier` | Avisar al panel de alertas nuevas y eventos cerrados | `AlertBroadcaster` (WebSocket) | `RecordingNotifier` |
@@ -89,6 +91,7 @@ Un archivo por caso de uso en `application/use_cases`:
 | `ReviewEvent` y `MarkFalseAlarm` (cierran evento y alertas) | `GetEvent` |
 | `MarkAlertSeen` | `GetPendingAlerts` (orden del heap) |
 | `UpdateCameraStatus` | `GetRecentEvents` (lista doble) |
+| `AuthenticateUser` (login con límite de intentos) | `GetSessionUser` (usuario de la sesión) |
 | `RebuildAlertBoard` (al arrancar) | `GetMetrics`, `GetEventTypeStatistics`, `GetCameraStatistics` |
 | | `ListEventTypes`, `ListLocations`, `ListCameras`, `ListZones`, `ListSubjects` |
 
@@ -98,6 +101,8 @@ Un archivo por caso de uso en `application/use_cases`:
   detrás de un candado, porque el servidor atiende peticiones en varios hilos.
 - `EventDeduplicator` descarta las detecciones repetidas del IoT dentro de
   una ventana de tiempo, con una cola enlazada y un diccionario.
+- `LoginThrottle` cuenta los inicios de sesión fallidos por correo en una
+  ventana de 15 minutos, con la misma combinación de estructuras.
 
 ## Flujo de una detección
 
@@ -135,12 +140,23 @@ no se toma como repetido.
 
 **Entrada (HTTP).** `adapters/inbound/http` contiene la fábrica
 `create_app(container)`, un router por recurso (`eventos`, `alertas`,
-`estadisticas`, `catalogos`, `camaras`, `health`), el WebSocket `/ws/alertas`,
-los esquemas Pydantic que fijan el contrato JSON, la dependencia `X-API-Key`
-(comparación en tiempo constante) y los middlewares: request-id, registro de
-acceso sin datos sensibles, cabeceras de seguridad, límite de tamaño del cuerpo
-y CORS. Los errores del dominio se traducen a 404, 409 y 422; los de la base, a
-503, 409 o 500 sin detalles internos.
+`estadisticas`, `catalogos`, `camaras`, `health`, `auth`), el WebSocket
+`/ws/alertas`, los esquemas Pydantic que fijan el contrato JSON y los
+middlewares: request-id, registro de acceso sin datos sensibles, cabeceras de
+seguridad, límite de tamaño del cuerpo y CORS con credenciales. Los errores del
+dominio se traducen a 404, 409 y 422; los de la base, a 503, 409 o 500 sin
+detalles internos; los del inicio de sesión, a 401 y 429.
+
+La autenticación es asunto de este adaptador
+([ADR 0007](adr/0007-sesion-con-cookie-firmada.md)): `sessions.py` firma y lee
+los tokens (cookie `sv_session` y ticket del WebSocket) con HMAC-SHA256, y
+`security.py` tiene las dependencias de FastAPI: `require_iot_key`,
+`require_session`, `require_panel_access` (sesión o clave) y la comprobación del
+`Origin` contra CSRF. La aplicación solo ve correos, contraseñas e ids de
+usuario.
+
+**Salida (contraseñas y reloj).** `Pbkdf2PasswordHasher` usa `hashlib` de la
+biblioteca estándar; `SystemClock` da la hora en UTC.
 
 **Salida (persistencia).** `adapters/outbound/persistence` mapea las tablas
 existentes con modelos ORM separados del dominio; los mappers convierten filas
@@ -164,7 +180,9 @@ flowchart TB
     bootstrap --> clockp["SystemClock"]
     bootstrap --> probe["DatabaseReadinessProbe"]
     bootstrap --> broadcaster["AlertBroadcaster"]
-    uow & clockp & probe & broadcaster --> container["Container (casos de uso)"]
+    bootstrap --> hasher["Pbkdf2PasswordHasher"]
+    bootstrap --> sessions["SessionPolicy (SESSION_SECRET)"]
+    uow & clockp & probe & broadcaster & hasher & sessions --> container["Container (casos de uso)"]
     container --> app["create_app → FastAPI"]
     app --> uvicorn["uvicorn …http.app:app"]
 ```
