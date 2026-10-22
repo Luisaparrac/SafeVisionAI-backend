@@ -58,9 +58,12 @@ def create_app(container: Container) -> FastAPI:
     app.add_middleware(AccessLogMiddleware)  # inside RequestIdMiddleware: sees the id
     app.add_middleware(RequestIdMiddleware)
     # Added last, so it is the outermost middleware and also answers preflight requests.
+    # The panel sends its session cookie, so credentials are allowed, but only for the
+    # origins named in FRONTEND_ORIGINS (the settings reject "*").
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(container.cors_origins),
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=[DUPLICATE_HEADER, REQUEST_ID_HEADER],
