@@ -13,6 +13,7 @@ from safevision.adapters.inbound.http.logging_setup import AccessLogMiddleware, 
 from safevision.adapters.inbound.http.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from safevision.adapters.inbound.http.routers import (
     alertas,
+    auth,
     camaras,
     catalogos,
     estadisticas,
@@ -30,6 +31,7 @@ DESCRIPTION = (
 
 TAGS = [
     {"name": "salud", "description": "Información del servicio y estado."},
+    {"name": "autenticación", "description": "Inicio y cierre de sesión del panel."},
     {"name": "eventos", "description": "Detecciones del módulo IoT y su revisión."},
     {"name": "alertas", "description": "Alertas pendientes por prioridad y métricas del panel."},
     {"name": "estadísticas", "description": "Conteos de eventos por tipo y por cámara."},
@@ -70,6 +72,7 @@ def create_app(container: Container) -> FastAPI:
     )
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(eventos.router)
     app.include_router(alertas.router)
     app.include_router(estadisticas.router)

@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from safevision.application.errors import (
+    InvalidCredentialsError,
     PersistenceError,
     StorageConflictError,
     StorageUnavailableError,
@@ -59,6 +60,11 @@ async def persistence_error_handler(_: Request, error: Exception) -> JSONRespons
     return JSONResponse(status_code=status, content={"detail": error.message})
 
 
+async def invalid_credentials_handler(_: Request, error: Exception) -> JSONResponse:
+    assert isinstance(error, InvalidCredentialsError)
+    return JSONResponse(status_code=401, content={"detail": error.message})
+
+
 async def unexpected_error_handler(_: Request, error: Exception) -> JSONResponse:
     logger.error("unexpected error: %s", type(error).__name__)
     return JSONResponse(status_code=500, content={"detail": INTERNAL_ERROR_MESSAGE})
@@ -67,4 +73,5 @@ async def unexpected_error_handler(_: Request, error: Exception) -> JSONResponse
 def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, domain_error_handler)
     app.add_exception_handler(PersistenceError, persistence_error_handler)
+    app.add_exception_handler(InvalidCredentialsError, invalid_credentials_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)

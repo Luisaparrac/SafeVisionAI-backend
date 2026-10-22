@@ -9,6 +9,7 @@ from safevision.application.ports.repositories import (
     CatalogRepository,
     EventRepository,
     EventTypeRepository,
+    UserRepository,
 )
 
 
@@ -28,6 +29,7 @@ class UnitOfWork(Protocol):
     event_types: EventTypeRepository
     cameras: CameraRepository
     catalog: CatalogRepository
+    users: UserRepository
 
     def __enter__(self) -> Self: ...
 

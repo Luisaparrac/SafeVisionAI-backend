@@ -9,6 +9,7 @@ from safevision.config.settings import Settings
 from tests.fakes.catalog import seed_reference_catalog
 from tests.fakes.clock import FakeClock
 from tests.fakes.unit_of_work import FakeUnitOfWork
+from tests.fakes.users import FAST_HASHER
 
 
 @pytest.fixture
@@ -35,10 +36,12 @@ def clock() -> FakeClock:
 
 @pytest.fixture
 def container(settings, uow, clock):
-    return build_container(settings, uow, clock)
+    return build_container(settings, uow, clock, password_hasher=FAST_HASHER)
 
 
 @pytest.fixture
 def client(container):
-    with TestClient(create_app(container)) as client:  # runs the lifespan
+    # https: the session cookie is Secure, so the client only sends it back over https.
+    app = create_app(container)
+    with TestClient(app, base_url="https://testserver") as client:  # runs the lifespan
         yield client

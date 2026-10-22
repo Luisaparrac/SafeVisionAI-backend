@@ -6,8 +6,10 @@ read it from the application state, so they never create infrastructure.
 
 from dataclasses import dataclass, field
 
+from safevision.adapters.inbound.http.sessions import SessionPolicy
 from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 from safevision.application.ports.readiness import ReadinessProbe
+from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
@@ -36,6 +38,7 @@ class Container:
     cors_origins: tuple[str, ...]
     readiness: ReadinessProbe
     alert_broadcaster: AlertBroadcaster
+    sessions: SessionPolicy
 
     rebuild_alert_board: RebuildAlertBoard
     register_event: RegisterEvent
@@ -55,3 +58,4 @@ class Container:
     update_camera_status: UpdateCameraStatus
     list_zones: ListZones
     list_subjects: ListSubjects
+    authenticate_user: AuthenticateUser

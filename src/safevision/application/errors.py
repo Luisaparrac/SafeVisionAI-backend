@@ -25,3 +25,12 @@ class StorageConflictError(PersistenceError):
     """The change contradicts data stored meanwhile (for example a deleted reference)."""
 
     default_message = "Los datos cambiaron mientras se procesaba la petición. Intenta de nuevo."
+
+
+class InvalidCredentialsError(Exception):
+    """Login refused. The message is the same whether the e-mail or the password failed."""
+
+    message = "Correo o contraseña incorrectos"
+
+    def __init__(self) -> None:
+        super().__init__(self.message)

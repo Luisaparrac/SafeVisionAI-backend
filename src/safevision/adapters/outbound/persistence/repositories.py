@@ -15,6 +15,7 @@ from safevision.adapters.outbound.persistence.orm import (
     EventTypeRow,
     LocationRow,
     SubjectRow,
+    UserRow,
     ZoneRow,
 )
 from safevision.application.ports.repositories import EventFilter
@@ -25,6 +26,7 @@ from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.location import Location
 from safevision.domain.model.subject import Subject
+from safevision.domain.model.user import User
 from safevision.domain.model.zone import Zone
 
 
@@ -50,6 +52,23 @@ class SqlAlchemyEventTypeRepository:
             select(EventTypeRow).order_by(EventTypeRow.severity_level.desc(), EventTypeRow.name)
         )
         return [mappers.event_type_to_domain(row) for row in rows]
+
+
+class SqlAlchemyUserRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, user_id: int) -> User | None:
+        row = self._session.get(UserRow, user_id)
+        return None if row is None else mappers.user_to_domain(row)
+
+    def find_by_email(self, email: str) -> list[User]:
+        rows = self._session.scalars(
+            select(UserRow)
+            .where(func.lower(func.trim(UserRow.email)) == email.strip().lower())
+            .order_by(UserRow.user_id)
+        )
+        return [mappers.user_to_domain(row) for row in rows]
 
 
 class SqlAlchemyCatalogRepository:

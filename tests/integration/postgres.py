@@ -23,6 +23,7 @@ from safevision.adapters.outbound.persistence.orm import (
     UserRow,
     ZoneRow,
 )
+from tests.fakes.users import TEST_EMAIL, TEST_NAME, TEST_PASSWORD_HASH
 from tests.integration.guard import UnsafeTestDatabaseError, ensure_safe_test_database
 
 SCHEMA = Path(__file__).with_name("schema.sql")
@@ -69,10 +70,11 @@ def pg_clean(pg_engine: Engine) -> Engine:
 def insert_reference_rows(session: Session) -> None:
     """Same catalog as the unit tests, with the same ids.
 
-    location 1 Casa; cameras 1 Sala, 2 Patio; zone 1 Escalera (camera 1);
+    user 1 (``tests.fakes.users``); location 1 Casa; cameras 1 Sala, 2 Patio;
+    zone 1 Escalera (camera 1);
     subject 1 Rosa; event types 1 Caída (4), 2 Merodeo (2), 3 Ruido (1), 4 Humo (3).
     """
-    session.add(UserRow(name="Usuario de prueba", email="usuario@example.com", password_hash="x"))
+    session.add(UserRow(name=TEST_NAME, email=TEST_EMAIL, password_hash=TEST_PASSWORD_HASH))
     session.flush()
     session.add(LocationRow(name="Casa", description=None, user_id=1))
     session.flush()

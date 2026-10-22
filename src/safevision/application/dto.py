@@ -30,6 +30,15 @@ class AlertView:
 
 
 @dataclass(frozen=True)
+class UserView:
+    """The signed-in user as the panel sees it; never includes the password hash."""
+
+    id: int
+    name: str
+    email: str
+
+
+@dataclass(frozen=True)
 class Metrics:
     total: int
     pending: int

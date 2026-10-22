@@ -29,6 +29,7 @@ from safevision.bootstrap import build_container
 from safevision.config.settings import Settings
 from tests.fakes.catalog import seed_reference_catalog
 from tests.fakes.unit_of_work import FakeUnitOfWork
+from tests.fakes.users import FAST_HASHER
 
 KEY = {"X-API-Key": "test-key"}
 EVENT_KEYS = {
@@ -57,7 +58,7 @@ SETTINGS = Settings(
 
 @contextmanager
 def hexagonal_client(uow: UnitOfWork) -> Iterator[TestClient]:
-    container = build_container(SETTINGS, uow, SystemClock())
+    container = build_container(SETTINGS, uow, SystemClock(), password_hasher=FAST_HASHER)
     with TestClient(create_app(container)) as client:  # runs the startup rebuild
         yield client
 
