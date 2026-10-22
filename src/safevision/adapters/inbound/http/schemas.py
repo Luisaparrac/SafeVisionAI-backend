@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from safevision.application.dto import AlertView, EventView, Metrics
+from safevision.application.dto import AlertView, EventView, Metrics, UserView
 from safevision.application.use_cases.register_event import RegisterEventCommand
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event_type import EventType
@@ -29,6 +29,7 @@ class EventOut(BaseModel):
     camera: str
     date: str
     time: str
+    occurred_at: str = Field(description="Instante ISO 8601 con zona, en TIMEZONE")
     priority: str = Field(description="Alto, Medio o Bajo")
     status: str = Field(description="Pendiente o Revisado")
     description: str | None = None
@@ -77,7 +78,7 @@ class EventIn(BaseModel):
             "examples": [
                 {
                     "camera_id": 1,
-                    "event_type": "Caída",
+                    "event_type": "Fall",
                     "subject_id": 1,
                     "zone_id": 1,
                     "detected_class": "person",
@@ -92,7 +93,10 @@ class EventIn(BaseModel):
 
     camera_id: int
     event_type_id: int | None = None
-    event_type: str | None = Field(None, description="Nombre del tipo, alternativa a event_type_id")
+    event_type: str | None = Field(
+        None,
+        description="Nombre del tipo como en /api/tipos-evento; alternativa a event_type_id",
+    )
     subject_id: int | None = None
     zone_id: int | None = None
     detected_class: Literal["person", "dog", "cat", "other_animal"] = "person"
@@ -216,3 +220,39 @@ class CameraCountOut(BaseModel):
     camera_id: int
     name: str
     total: int
+
+
+# RFC 5321 limit for an address; passwords are capped so one request cannot hash megabytes.
+MAX_EMAIL_LENGTH = 320
+MAX_PASSWORD_LENGTH = 1024
+
+
+class LoginIn(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"email": "usuario@example.com", "password": "contraseña"}]}
+    )
+
+    email: str = Field(max_length=MAX_EMAIL_LENGTH)
+    password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+    email: str
+
+
+class SessionOut(BaseModel):
+    """Answer of login and of the current session; the frontend reads ``authenticated``."""
+
+    authenticated: bool = True
+    user: UserOut
+
+    @classmethod
+    def from_view(cls, view: UserView) -> "SessionOut":
+        return cls(user=UserOut(id=view.id, name=view.name, email=view.email))
+
+
+class WsTicketOut(BaseModel):
+    ticket: str = Field(description="Se envía como /ws/alertas?ticket=...")
+    expires_in: int = Field(description="Segundos de validez")

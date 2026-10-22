@@ -10,8 +10,14 @@ from safevision.adapters.inbound.http.schemas import (
     SubjectOut,
     ZoneOut,
 )
+from safevision.adapters.inbound.http.security import AUTH_RESPONSES, require_panel_access
 
-router = APIRouter(prefix="/api", tags=["catálogos"])
+router = APIRouter(
+    prefix="/api",
+    tags=["catálogos"],
+    dependencies=[Depends(require_panel_access)],
+    responses=AUTH_RESPONSES,
+)
 
 
 @router.get("/tipos-evento", response_model=list[EventTypeOut])

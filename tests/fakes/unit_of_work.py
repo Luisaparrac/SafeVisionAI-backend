@@ -4,6 +4,7 @@ from tests.fakes.repositories import (
     InMemoryCatalogRepository,
     InMemoryEventRepository,
     InMemoryEventTypeRepository,
+    InMemoryUserRepository,
 )
 
 
@@ -19,6 +20,7 @@ class FakeUnitOfWork:
         self.event_types = InMemoryEventTypeRepository()
         self.cameras = InMemoryCameraRepository()
         self.catalog = InMemoryCatalogRepository()
+        self.users = InMemoryUserRepository()
         self.commits = 0
         self._committed_state = self._snapshot()
 
@@ -38,7 +40,14 @@ class FakeUnitOfWork:
             repo.restore(state)
 
     def _repositories(self) -> tuple:
-        return (self.events, self.alerts, self.event_types, self.cameras, self.catalog)
+        return (
+            self.events,
+            self.alerts,
+            self.event_types,
+            self.cameras,
+            self.catalog,
+            self.users,
+        )
 
     def _snapshot(self) -> tuple:
         return tuple(repo.snapshot() for repo in self._repositories())

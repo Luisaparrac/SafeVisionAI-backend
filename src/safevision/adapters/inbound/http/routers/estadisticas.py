@@ -7,8 +7,14 @@ from fastapi import APIRouter, Depends, Query
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
 from safevision.adapters.inbound.http.schemas import CameraCountOut, EventTypeCountOut
+from safevision.adapters.inbound.http.security import AUTH_RESPONSES, require_panel_access
 
-router = APIRouter(prefix="/api/estadisticas", tags=["estadísticas"])
+router = APIRouter(
+    prefix="/api/estadisticas",
+    tags=["estadísticas"],
+    dependencies=[Depends(require_panel_access)],
+    responses=AUTH_RESPONSES,
+)
 
 DESDE = Query(None, description="Fecha local inicial (AAAA-MM-DD), inclusive")
 HASTA = Query(None, description="Fecha local final (AAAA-MM-DD), inclusive")

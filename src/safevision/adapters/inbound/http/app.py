@@ -13,6 +13,7 @@ from safevision.adapters.inbound.http.logging_setup import AccessLogMiddleware, 
 from safevision.adapters.inbound.http.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from safevision.adapters.inbound.http.routers import (
     alertas,
+    auth,
     camaras,
     catalogos,
     estadisticas,
@@ -30,6 +31,7 @@ DESCRIPTION = (
 
 TAGS = [
     {"name": "salud", "description": "Información del servicio y estado."},
+    {"name": "autenticación", "description": "Inicio y cierre de sesión del panel."},
     {"name": "eventos", "description": "Detecciones del módulo IoT y su revisión."},
     {"name": "alertas", "description": "Alertas pendientes por prioridad y métricas del panel."},
     {"name": "estadísticas", "description": "Conteos de eventos por tipo y por cámara."},
@@ -58,15 +60,19 @@ def create_app(container: Container) -> FastAPI:
     app.add_middleware(AccessLogMiddleware)  # inside RequestIdMiddleware: sees the id
     app.add_middleware(RequestIdMiddleware)
     # Added last, so it is the outermost middleware and also answers preflight requests.
+    # The panel sends its session cookie, so credentials are allowed, but only for the
+    # origins named in FRONTEND_ORIGINS (the settings reject "*").
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(container.cors_origins),
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=[DUPLICATE_HEADER, REQUEST_ID_HEADER],
     )
     install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(eventos.router)
     app.include_router(alertas.router)
     app.include_router(estadisticas.router)
@@ -79,8 +85,8 @@ def create_app(container: Container) -> FastAPI:
 def create_app_from_env() -> FastAPI:
     """Production entry point: settings from the environment (and from .env when present).
 
-    Only DATABASE_URL and IOT_API_KEY are required; if either is missing the
-    process stops here instead of answering requests.
+    Only DATABASE_URL, IOT_API_KEY and SESSION_SECRET are required; if one is
+    missing or invalid the process stops here instead of answering requests.
     """
     from dotenv import load_dotenv
 

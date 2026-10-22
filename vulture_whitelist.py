@@ -11,6 +11,10 @@ pending_alerts
 alerts_feed
 by_event_type
 by_camera
+login
+me
+logout
+ws_ticket
 
 # Pydantic reads these class attributes to build and serialize the models.
 model_config
@@ -18,11 +22,8 @@ id_alerta
 nivel
 pendientes
 alto
-
-# The users table is referenced by foreign keys and filled by the integration tests.
-UserRow
-email
-password_hash
+authenticated
+expires_in
 
 # Parameters of protocol (port) methods and of __exit__, which only declare a signature.
 exc_type

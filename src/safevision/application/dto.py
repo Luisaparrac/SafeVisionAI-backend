@@ -15,6 +15,7 @@ class EventView:
     camera: str
     date: str  # local date, ISO format
     time: str  # local time, HH:MM:SS
+    occurred_at: str  # ISO 8601 instant with the offset of the local time zone
     priority: str  # Alto / Medio / Bajo
     status: str  # Pendiente / Revisado
     description: str | None
@@ -26,6 +27,15 @@ class AlertView:
     level: str  # Alto / Medio / Bajo
     status: str  # Activa / Vista / Atendida / Descartada
     event: EventView
+
+
+@dataclass(frozen=True)
+class UserView:
+    """The signed-in user as the panel sees it; never includes the password hash."""
+
+    id: int
+    name: str
+    email: str
 
 
 @dataclass(frozen=True)

@@ -15,22 +15,29 @@ lista que genera FastAPI.
 
 | Código | Cuándo |
 |---|---|
-| 401 | Falta `X-API-Key` o no coincide (`{"detail": "X-API-Key inválida"}`) |
+| 401 | Sin sesión válida ni `X-API-Key` (`"Inicia sesión para continuar"`), clave incorrecta en una ruta del IoT (`"X-API-Key inválida"`) o credenciales incorrectas en el login (`"Correo o contraseña incorrectos"`) |
+| 403 | Cambio con la cookie de sesión desde un origen no permitido (`"Origen no permitido"`) |
 | 404 | No existe el recurso o una referencia (cámara, tipo, sujeto, zona) |
 | 409 | Transición no permitida (por ejemplo, falsa alarma sobre un evento ya resuelto) o conflicto con datos que cambiaron |
 | 413 | El cuerpo supera 64 KiB |
 | 422 | Cuerpo o parámetros inválidos |
+| 429 | Demasiados inicios de sesión fallidos con un correo |
 | 500 | Error inesperado: `{"detail": "Error interno del servidor"}`, sin detalles internos |
 | 503 | La base de datos no está disponible |
 
 **Encabezados de respuesta.** Todas las respuestas llevan `X-Request-ID` (el
 que envió el cliente si es seguro, o uno nuevo), `X-Content-Type-Options:
 nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: no-referrer`. CORS
-permite los orígenes de `FRONTEND_ORIGINS` y expone `X-Duplicate` y
-`X-Request-ID`.
+permite los orígenes de `FRONTEND_ORIGINS` con credenciales
+(`Access-Control-Allow-Credentials: true` y el origen exacto, nunca `*`) y
+expone `X-Duplicate` y `X-Request-ID`.
 
-**Autenticación.** Solo las rutas del módulo IoT exigen `X-API-Key`. Las del
-panel no piden credenciales (la autenticación del panel es una mejora futura).
+**Autenticación.** Todas las rutas de `/api`, salvo `POST /api/auth/login` y
+`POST /api/auth/logout`, exigen la cookie de sesión del panel **o** la
+`X-API-Key` del módulo IoT; `POST /api/eventos` y
+`PATCH /api/camaras/{id}/estado` exigen siempre la clave. Son públicas
+`GET /`, `/health`, `/health/ready`, `/docs` y `/openapi.json`. Detalle en
+[Autenticación](#autenticación).
 
 ### EventView (contrato)
 
@@ -45,6 +52,7 @@ Forma de cada evento en todas las respuestas:
   "camera": "Sala",
   "date": "2026-10-14",
   "time": "07:05:31",
+  "occurred_at": "2026-10-14T07:05:31-05:00",
   "priority": "Alto",
   "status": "Pendiente",
   "description": "Persona en el piso"
@@ -57,8 +65,96 @@ Forma de cada evento en todas las respuestas:
 | `subject` | Nombre del sujeto o, si no se identificó, la clase detectada: "Persona sin identificar", "Perro sin identificar", "Gato sin identificar", "Animal sin identificar" |
 | `location` | Ubicación de la cámara y, si hay zona, " · " y el nombre de la zona |
 | `date`, `time` | Fecha (`AAAA-MM-DD`) y hora (`HH:MM:SS`) en `TIMEZONE` |
+| `occurred_at` | El mismo instante en ISO 8601 con la zona de `TIMEZONE` (por ejemplo `2026-10-14T07:05:31-05:00`) |
 | `priority` | `Alto` (severidad 3–4), `Medio` (2) o `Bajo` (1) |
 | `status` | `Pendiente` (pending, in_review) o `Revisado` (resolved, false_alarm) |
+
+---
+
+## Autenticación
+
+Decisión y alternativas en [ADR 0007](adr/0007-sesion-con-cookie-firmada.md).
+
+### Sesión del panel
+
+El inicio de sesión deja una cookie que el navegador envía sola en cada
+petición (`credentials: "include"` en `fetch`). El panel nunca ve el token.
+
+| Atributo | Valor |
+|---|---|
+| Nombre | `sv_session` |
+| Contenido | Id del usuario, emisión y expiración, firmados con HMAC-SHA256 y `SESSION_SECRET` |
+| Duración | `SESSION_TTL_HOURS` (8 h por defecto), sin renovación |
+| Atributos | `HttpOnly`, `Secure`, `Path=/`, sin `Domain`, `SameSite` de `SESSION_COOKIE_SAMESITE` (`none` por defecto o `lax`) |
+
+En cada petición el usuario se vuelve a leer de la tabla `users`: si ya no
+existe, la sesión deja de valer (401). Como la cookie es `Secure`, el navegador
+solo la envía por https (o a `localhost`).
+
+**Protección CSRF.** Un `POST`, `PUT`, `PATCH` o `DELETE` con la cookie debe
+traer `Origin` (o, si falta, `Referer`) de `FRONTEND_ORIGINS` o del propio
+backend (la página `/docs`); si no, `403 {"detail": "Origen no permitido"}`. Los
+navegadores envían `Origin` solos; el panel no tiene que hacer nada. Las
+peticiones con una `X-API-Key` válida no pasan por esta comprobación.
+
+### `POST /api/auth/login`
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{"email": "usuario@example.com", "password": "contraseña"}
+```
+
+```http
+HTTP/1.1 200 OK
+Set-Cookie: sv_session=<token>; HttpOnly; Max-Age=28800; Path=/; SameSite=none; Secure
+Content-Type: application/json
+
+{"authenticated": true, "user": {"id": 1, "name": "Usuario de prueba", "email": "usuario@example.com"}}
+```
+
+- El correo se compara sin distinguir mayúsculas ni espacios a los lados y debe
+  pertenecer a **exactamente un** usuario (la columna no es única).
+- `401 {"detail": "Correo o contraseña incorrectos"}` ante cualquier fallo, con
+  el mismo mensaje y un tiempo de respuesta similar exista o no el correo.
+- `429 {"detail": "Demasiados intentos fallidos. Intenta de nuevo en unos
+  minutos."}` tras 5 fallos con el mismo correo en 15 minutos, hasta que el más
+  antiguo cumple 15 minutos (aunque la contraseña sea correcta). Un inicio
+  correcto borra la cuenta de fallos.
+- `422` si falta un campo, el correo supera 320 caracteres o la contraseña
+  1024.
+- Las contraseñas se guardan en `users.password_hash` como
+  `pbkdf2_sha256$600000$<sal>$<hash>` (base64). Un hash en otro formato nunca
+  valida: esa cuenta recibe 401 hasta que se le asigna uno nuevo con
+  `scripts/hash_password.py` (ver el README).
+
+### `GET /api/auth/me`
+
+Con la cookie: `200` con el mismo cuerpo que el login. Sin cookie, con una
+cookie alterada o vencida, o si el usuario ya no existe:
+`401 {"detail": "Inicia sesión para continuar"}`. El panel la llama al cargar
+para decidir si muestra el formulario.
+
+### `POST /api/auth/logout`
+
+`204` sin cuerpo y `Set-Cookie: sv_session=""; Max-Age=0; ...` con los mismos
+atributos, de modo que el navegador la borra. Funciona también sin sesión, así
+que repetirlo no falla. Con la cookie, aplica la protección CSRF.
+
+### `GET /api/auth/ws-ticket`
+
+Requiere la cookie (la `X-API-Key` no basta). Responde
+`{"ticket": "<token>", "expires_in": 60}`: un token firmado que solo sirve para
+abrir `/ws/alertas?ticket=<token>` durante 60 segundos. Sirve cuando el
+navegador no envía la cookie con el WebSocket.
+
+### Lo que el frontend detecta
+
+- La ruta de sesión es `GET /api/auth/me` y la de inicio de sesión
+  `POST /api/auth/login` (ambas en `/openapi.json`).
+- La sesión es válida si la respuesta trae `authenticated: true` y `user.id`.
+- Un `401` en cualquier ruta significa que hay que mostrar el login.
 
 ---
 
@@ -191,6 +287,9 @@ Empates por id.
 
 ## Catálogos (contrato, solo lectura)
 
+Con la sesión del panel o con la `X-API-Key` del módulo IoT, que los usa para
+resolver cámaras y tipos.
+
 | Ruta | Elemento | Orden |
 |---|---|---|
 | `GET /api/tipos-evento` | `{"event_type_id", "name", "description", "severity_level", "priority"}` | Severidad descendente, luego nombre |
@@ -209,8 +308,17 @@ Encabezado `X-API-Key`. Cuerpo `{"status": "disconnected"}` con `active`,
 
 ## WebSocket `/ws/alertas`
 
-Conexión sin credenciales. El servidor envía JSON; los mensajes del cliente se
-ignoran.
+Se acepta con **una** de estas credenciales:
+
+| Credencial | Cómo |
+|---|---|
+| Ticket | `/ws/alertas?ticket=<token>` con un ticket de `GET /api/auth/ws-ticket` (60 s) |
+| Cookie de sesión | La envía el navegador; el `Origin` debe ser de `FRONTEND_ORIGINS` o del backend |
+| `X-API-Key` | Encabezado del saludo (módulo IoT, scripts) |
+
+Sin credenciales válidas la conexión se acepta y se cierra de inmediato con el
+código **4401**: el panel debe ir al login en lugar de reintentar. El servidor
+envía JSON; los mensajes del cliente se ignoran.
 
 | `tipo` | Contenido | Cuándo |
 |---|---|---|
@@ -220,4 +328,5 @@ ignoran.
 
 Cada cliente tiene una cola de 100 mensajes: si no los lee a tiempo, pierde los
 más nuevos en lugar de frenar al servidor. Ante una desconexión, el panel debe
-reconectarse y pedir `/api/alertas/pendientes` para ponerse al día.
+reconectarse (con un ticket nuevo si usa tickets) y pedir
+`/api/alertas/pendientes` para ponerse al día.

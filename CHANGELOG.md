@@ -2,12 +2,26 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 Cada versión agrupa las fases del plan de refactorización que entraron a `main`.
-El contrato HTTP que usan el panel y el módulo IoT no cambió en ninguna: todo lo
-nuevo es aditivo.
+Hasta la 3.0.0 el contrato HTTP que usan el panel y el módulo IoT no cambió:
+todo lo nuevo fue aditivo. La fase 12 (sin publicar) exige autenticación en las
+rutas del panel; las formas JSON se mantienen.
 
 ## [Sin publicar]
 
 ### Agregado
+- Inicio de sesión del panel con los usuarios de la tabla `users`:
+  `POST /api/auth/login`, `GET /api/auth/me` y `POST /api/auth/logout`, con la
+  cookie `sv_session` (`HttpOnly`, `Secure`, firmada con HMAC-SHA256).
+- Contraseñas con PBKDF2-SHA256 de la biblioteca estándar y
+  `scripts/hash_password.py` para generar el hash que se guarda en la base.
+- Límite de 5 inicios de sesión fallidos por correo en 15 minutos (429), con
+  una ventana deslizante sobre la cola enlazada.
+- `GET /api/auth/ws-ticket`: ticket de 60 s para abrir `/ws/alertas`.
+- Campo `occurred_at` (ISO 8601 con zona) en las vistas de evento, además de
+  `date` y `time`.
+- Variables `SESSION_SECRET` (obligatoria), `SESSION_TTL_HOURS` y
+  `SESSION_COOKIE_SAMESITE`.
+- ADR 0007 (reemplaza a la 0006) y sección de autenticación en `docs/api.md`.
 - Imagen Docker multi-etapa con solo dependencias de producción y el mismo
   comando de arranque que `render.yaml`.
 - `docker compose` con PostgreSQL local, `schema.sql` y datos de ejemplo
@@ -21,9 +35,21 @@ nuevo es aditivo.
 - Documentación en español: README, arquitectura, estructuras de datos,
   referencia de la API, ADR, guía de contribución y política de seguridad.
 
+### Cambiado
+- Todas las rutas de `/api`, salvo iniciar y cerrar sesión, exigen la cookie
+  de sesión o la `X-API-Key` (401). La clave sigue leyendo los catálogos.
+- Los cambios hechos con la cookie exigen un `Origin` de `FRONTEND_ORIGINS` o
+  del propio backend (403).
+- `/ws/alertas` exige ticket, cookie desde un origen permitido o `X-API-Key`;
+  sin credenciales cierra con 4401.
+- `FRONTEND_ORIGINS` ya no admite `*`.
+- El ejemplo OpenAPI de `POST /api/eventos` usa el nombre del catálogo real.
+
 ### Corregido
 - Las conexiones WebSocket se registraban con la IP del cliente (línea de
   uvicorn); ahora se registran con request-id, ruta y resultado.
+- CORS no respondía `Access-Control-Allow-Credentials`, así que el navegador
+  descartaba las respuestas del panel, que envía `credentials: "include"`.
 
 ## [3.0.0] - 2026-10-16
 

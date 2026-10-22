@@ -14,6 +14,7 @@ from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.location import Location
 from safevision.domain.model.subject import Subject
+from safevision.domain.model.user import User
 from safevision.domain.model.values import EventStatus
 from safevision.domain.model.zone import Zone
 
@@ -132,4 +133,19 @@ class CatalogRepository(Protocol):
 
     def list_subjects(self) -> list[Subject]:
         """All subjects ordered by id."""
+        ...
+
+
+@runtime_checkable
+class UserRepository(Protocol):
+    """Read-only access to the people who sign in to the panel."""
+
+    def get(self, user_id: int) -> User | None: ...
+
+    def find_by_email(self, email: str) -> list[User]:
+        """Users whose e-mail equals ``email`` ignoring case and surrounding spaces, by id.
+
+        A list because the column is not unique: callers decide what to do when
+        more than one user shares an address.
+        """
         ...

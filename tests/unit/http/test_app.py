@@ -13,8 +13,28 @@ def test_root_and_health(client):
 def test_cors_uses_the_configured_origins(client):
     allowed = client.get("/health", headers={"Origin": "http://localhost:5173"})
     assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert allowed.headers["access-control-allow-credentials"] == "true"
     other = client.get("/health", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in other.headers
+
+
+def test_preflight_allows_credentials_for_the_configured_origins(client):
+    preflight = {
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": "PATCH",
+        "Access-Control-Request-Headers": "content-type",
+    }
+    response = client.options("/api/eventos/1/revisar", headers=preflight)
+    assert response.status_code == 200
+    # The exact origin, never "*": browsers drop credentialed responses with a wildcard.
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert response.headers["access-control-allow-credentials"] == "true"
+    assert "PATCH" in response.headers["access-control-allow-methods"]
+    rejected = client.options(
+        "/api/eventos/1/revisar", headers=preflight | {"Origin": "https://evil.example"}
+    )
+    assert rejected.status_code == 400
+    assert "access-control-allow-origin" not in rejected.headers
 
 
 def test_openapi_metadata(client):
@@ -52,7 +72,8 @@ def test_openapi_has_examples_for_the_iot_requests(client):
     schemas = client.get("/openapi.json").json()["components"]["schemas"]
     event_examples = schemas["EventIn"]["examples"]
     status_examples = schemas["CameraStatusIn"]["examples"]
-    assert event_examples[0]["event_type"] == "Caída"
+    # Names of the real catalog (event_types), not translations.
+    assert event_examples[0]["event_type"] == "Fall"
     assert status_examples == [{"status": "disconnected"}]
     # The examples are valid requests.
     for example in event_examples:

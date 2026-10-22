@@ -3,21 +3,27 @@
 from datetime import timedelta
 
 from safevision.adapters.inbound.http.container import Container
+from safevision.adapters.inbound.http.sessions import SessionPolicy, TokenSigner
 from safevision.adapters.inbound.http.websocket import AlertBroadcaster
+from safevision.adapters.outbound.pbkdf2_password_hasher import Pbkdf2PasswordHasher
 from safevision.adapters.outbound.persistence.database import make_engine, make_session_factory
 from safevision.adapters.outbound.persistence.readiness import DatabaseReadinessProbe
 from safevision.adapters.outbound.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from safevision.adapters.outbound.system_clock import SystemClock
 from safevision.application.ports.clock import Clock
+from safevision.application.ports.password_hasher import PasswordHasher
 from safevision.application.ports.readiness import ReadinessProbe
 from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.application.presenter import EventPresenter
 from safevision.application.services.alert_board import AlertBoard
 from safevision.application.services.event_deduplicator import EventDeduplicator
+from safevision.application.services.login_throttle import LoginThrottle
+from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
+from safevision.application.use_cases.get_session_user import GetSessionUser
 from safevision.application.use_cases.get_statistics import (
     GetCameraStatistics,
     GetEventTypeStatistics,
@@ -49,8 +55,14 @@ def build_container(
     uow: UnitOfWork,
     clock: Clock,
     readiness: ReadinessProbe | None = None,
+    password_hasher: PasswordHasher | None = None,
 ) -> Container:
-    """Wires the use cases around one unit of work, one clock and one in-memory board."""
+    """Wires the use cases around one unit of work, one clock and one in-memory board.
+
+    ``password_hasher`` defaults to PBKDF2 with its production iterations; tests
+    pass a cheaper one so each login does not take half a second.
+    """
+    hasher = password_hasher or Pbkdf2PasswordHasher()
     presenter = EventPresenter(settings.tzinfo)
     board = AlertBoard(settings.history_capacity)
     deduplicator = EventDeduplicator(timedelta(seconds=settings.dedup_window_seconds), clock.now)
@@ -60,6 +72,11 @@ def build_container(
         cors_origins=settings.frontend_origins,
         readiness=readiness or AlwaysReady(),
         alert_broadcaster=broadcaster,
+        sessions=SessionPolicy(
+            signer=TokenSigner(settings.session_secret, clock.now),
+            lifetime=timedelta(hours=settings.session_ttl_hours),
+            same_site=settings.session_cookie_samesite,
+        ),
         rebuild_alert_board=RebuildAlertBoard(uow, board, presenter),
         register_event=RegisterEvent(uow, clock, board, deduplicator, presenter, broadcaster),
         review_event=ReviewEvent(uow, clock, board, presenter, broadcaster),
@@ -78,6 +95,8 @@ def build_container(
         update_camera_status=UpdateCameraStatus(uow),
         list_zones=ListZones(uow),
         list_subjects=ListSubjects(uow),
+        authenticate_user=AuthenticateUser(uow, hasher, LoginThrottle(clock.now)),
+        get_session_user=GetSessionUser(uow),
     )
 
 

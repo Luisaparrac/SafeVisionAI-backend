@@ -13,6 +13,7 @@ from safevision.adapters.outbound.persistence.orm import (
     EventTypeRow,
     LocationRow,
     SubjectRow,
+    UserRow,
     ZoneRow,
 )
 from safevision.domain.model.alert import Alert
@@ -21,6 +22,7 @@ from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.location import Location
 from safevision.domain.model.subject import Subject
+from safevision.domain.model.user import User
 from safevision.domain.model.zone import Zone
 
 
@@ -31,6 +33,10 @@ def event_type_to_domain(row: EventTypeRow) -> EventType:
         description=row.description,
         severity=row.severity_level,
     )
+
+
+def user_to_domain(row: UserRow) -> User:
+    return User(id=row.user_id, name=row.name, email=row.email, password_hash=row.password_hash)
 
 
 def location_to_domain(row: LocationRow) -> Location:

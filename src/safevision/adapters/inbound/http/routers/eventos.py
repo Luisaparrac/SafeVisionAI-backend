@@ -7,9 +7,15 @@ from fastapi import APIRouter, Depends, Query, Response
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
 from safevision.adapters.inbound.http.schemas import EventIn, EventOut
-from safevision.adapters.inbound.http.security import require_iot_key
+from safevision.adapters.inbound.http.security import (
+    AUTH_RESPONSES,
+    require_iot_key,
+    require_panel_access,
+)
 
-router = APIRouter(prefix="/api/eventos", tags=["eventos"])
+router = APIRouter(prefix="/api/eventos", tags=["eventos"], responses=AUTH_RESPONSES)
+# Every route is for the panel except the registration, which only the IoT module uses.
+PANEL = [Depends(require_panel_access)]
 
 # Sent when a repeated detection reused a recent event instead of creating one.
 DUPLICATE_HEADER = "X-Duplicate"
@@ -17,7 +23,7 @@ DUPLICATE_HEADER = "X-Duplicate"
 MAX_PAGE_SIZE = 500
 
 
-@router.get("", response_model=list[EventOut])
+@router.get("", response_model=list[EventOut], dependencies=PANEL)
 def list_events(
     q: str | None = None,
     prioridad: str | None = Query(None, description="Alto, Medio o Bajo"),
@@ -44,7 +50,7 @@ def list_events(
 
 
 # Declared before /{event_id} so "recientes" is not read as an id.
-@router.get("/recientes", response_model=list[EventOut])
+@router.get("/recientes", response_model=list[EventOut], dependencies=PANEL)
 def recent_events(
     limit: int = Query(20, ge=1, le=100), container: Container = Depends(get_container)
 ) -> list[EventOut]:
@@ -52,7 +58,7 @@ def recent_events(
     return [EventOut.from_view(view) for view in container.get_recent_events.execute(limit)]
 
 
-@router.get("/{event_id}", response_model=EventOut)
+@router.get("/{event_id}", response_model=EventOut, dependencies=PANEL)
 def get_event(event_id: int, container: Container = Depends(get_container)) -> EventOut:
     return EventOut.from_view(container.get_event.execute(event_id))
 
@@ -77,7 +83,7 @@ def register_event(
     return EventOut.from_view(result.view)
 
 
-@router.patch("/{event_id}/revisar", response_model=EventOut)
+@router.patch("/{event_id}/revisar", response_model=EventOut, dependencies=PANEL)
 def review_event(event_id: int, container: Container = Depends(get_container)) -> EventOut:
     """Marks the event as reviewed and closes its alerts; repeating it changes nothing."""
     return EventOut.from_view(container.review_event.execute(event_id))
@@ -86,6 +92,7 @@ def review_event(event_id: int, container: Container = Depends(get_container)) -
 @router.patch(
     "/{event_id}/falsa-alarma",
     response_model=EventOut,
+    dependencies=PANEL,
     responses={409: {"description": "El evento ya fue resuelto"}},
 )
 def mark_false_alarm(event_id: int, container: Container = Depends(get_container)) -> EventOut:

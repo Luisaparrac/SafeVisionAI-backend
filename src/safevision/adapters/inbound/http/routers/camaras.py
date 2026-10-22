@@ -5,12 +5,16 @@ from fastapi import APIRouter, Depends
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
 from safevision.adapters.inbound.http.schemas import CameraOut, CameraStatusIn, CameraStatusOut
-from safevision.adapters.inbound.http.security import require_iot_key
+from safevision.adapters.inbound.http.security import (
+    AUTH_RESPONSES,
+    require_iot_key,
+    require_panel_access,
+)
 
-router = APIRouter(prefix="/api/camaras", tags=["cámaras"])
+router = APIRouter(prefix="/api/camaras", tags=["cámaras"], responses=AUTH_RESPONSES)
 
 
-@router.get("", response_model=list[CameraOut])
+@router.get("", response_model=list[CameraOut], dependencies=[Depends(require_panel_access)])
 def list_cameras(container: Container = Depends(get_container)) -> list[CameraOut]:
     return [CameraOut.from_entity(camera) for camera in container.list_cameras.execute()]
 

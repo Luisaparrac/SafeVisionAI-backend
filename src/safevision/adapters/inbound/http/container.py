@@ -4,14 +4,19 @@ The composition root (``safevision.bootstrap``) builds it; the routers only
 read it from the application state, so they never create infrastructure.
 """
 
-from dataclasses import dataclass, field
+from __future__ import annotations
 
-from safevision.adapters.inbound.http.websocket import AlertBroadcaster
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from safevision.adapters.inbound.http.sessions import SessionPolicy
 from safevision.application.ports.readiness import ReadinessProbe
+from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.application.use_cases.get_event import GetEvent
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
+from safevision.application.use_cases.get_session_user import GetSessionUser
 from safevision.application.use_cases.get_statistics import (
     GetCameraStatistics,
     GetEventTypeStatistics,
@@ -29,6 +34,11 @@ from safevision.application.use_cases.register_event import RegisterEvent
 from safevision.application.use_cases.review_event import ReviewEvent
 from safevision.application.use_cases.update_camera_status import UpdateCameraStatus
 
+if TYPE_CHECKING:
+    # Only a type: the WebSocket endpoint uses the security checks, which read the
+    # container, so importing the module here would be circular.
+    from safevision.adapters.inbound.http.websocket import AlertBroadcaster
+
 
 @dataclass(frozen=True, kw_only=True)
 class Container:
@@ -36,6 +46,7 @@ class Container:
     cors_origins: tuple[str, ...]
     readiness: ReadinessProbe
     alert_broadcaster: AlertBroadcaster
+    sessions: SessionPolicy
 
     rebuild_alert_board: RebuildAlertBoard
     register_event: RegisterEvent
@@ -55,3 +66,5 @@ class Container:
     update_camera_status: UpdateCameraStatus
     list_zones: ListZones
     list_subjects: ListSubjects
+    authenticate_user: AuthenticateUser
+    get_session_user: GetSessionUser

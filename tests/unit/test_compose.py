@@ -31,7 +31,8 @@ def test_api_uses_the_image_of_this_repository_and_waits_for_the_database():
 
 
 def test_example_has_every_variable_the_backend_requires():
-    assert {"DATABASE_URL", "IOT_API_KEY", "FRONTEND_ORIGINS", "TIMEZONE"} <= set(EXAMPLE)
+    required = {"DATABASE_URL", "IOT_API_KEY", "SESSION_SECRET", "FRONTEND_ORIGINS", "TIMEZONE"}
+    assert required <= set(EXAMPLE)
     url = EXAMPLE["DATABASE_URL"]
     assert url == (
         f"postgresql://{EXAMPLE['POSTGRES_USER']}:{EXAMPLE['POSTGRES_PASSWORD']}"
@@ -42,6 +43,7 @@ def test_example_has_every_variable_the_backend_requires():
 def test_example_credentials_are_development_markers():
     assert EXAMPLE["POSTGRES_PASSWORD"].startswith("dev-only-")
     assert EXAMPLE["IOT_API_KEY"].startswith("dev-only-")
+    assert EXAMPLE["SESSION_SECRET"].startswith("dev-only-")
 
 
 def test_real_compose_values_stay_out_of_git():

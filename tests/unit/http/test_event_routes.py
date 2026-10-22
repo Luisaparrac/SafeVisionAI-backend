@@ -1,5 +1,7 @@
 import pytest
 
+from tests.unit.http.conftest import log_in
+
 KEY = {"X-API-Key": "test-key"}
 
 
@@ -20,6 +22,7 @@ def test_register_uses_the_clock_in_the_configured_time_zone(client):
     # FakeClock starts at 12:00 UTC, which is 07:00 in Bogotá.
     created = post(client, camera_id=1, event_type_id=1)
     assert (created["date"], created["time"]) == ("2026-10-14", "07:00:00")
+    assert created["occurred_at"] == "2026-10-14T07:00:00-05:00"
 
 
 def test_register_requires_the_key(client):
@@ -113,6 +116,7 @@ def test_filter_by_dates(client, clock):
     # FakeClock: 2026-10-14 12:00 UTC, 07:00 in Bogotá.
     today = post(client, camera_id=1, event_type_id=3)
     clock.advance(24 * 3600)
+    log_in(client)  # the session of yesterday has expired
     tomorrow = post(client, camera_id=1, event_type_id=3)
     params = {"desde": "2026-10-14", "hasta": "2026-10-14"}
     assert client.get("/api/eventos", params=params).json() == [today]

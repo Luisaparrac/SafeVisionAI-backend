@@ -24,6 +24,7 @@ from safevision.adapters.outbound.persistence.repositories import (
     SqlAlchemyCatalogRepository,
     SqlAlchemyEventRepository,
     SqlAlchemyEventTypeRepository,
+    SqlAlchemyUserRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class _Transaction:
         self.event_types = SqlAlchemyEventTypeRepository(session)
         self.cameras = SqlAlchemyCameraRepository(session)
         self.catalog = SqlAlchemyCatalogRepository(session)
+        self.users = SqlAlchemyUserRepository(session)
 
 
 class SqlAlchemyUnitOfWork:
@@ -93,6 +95,10 @@ class SqlAlchemyUnitOfWork:
     @property
     def catalog(self) -> SqlAlchemyCatalogRepository:
         return self._current().catalog
+
+    @property
+    def users(self) -> SqlAlchemyUserRepository:
+        return self._current().users
 
     def _current(self) -> _Transaction:
         transaction = getattr(self._local, "transaction", None)

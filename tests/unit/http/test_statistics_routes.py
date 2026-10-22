@@ -1,3 +1,5 @@
+from tests.unit.http.conftest import log_in
+
 KEY = {"X-API-Key": "test-key"}
 
 
@@ -27,6 +29,7 @@ def test_statistics_by_camera_with_dates(client, clock):
     # FakeClock: 2026-10-14 07:00 in Bogotá.
     post(client, 2, 3)
     clock.advance(24 * 3600)
+    log_in(client)  # the session of yesterday has expired
     post(client, 1, 3)
     everything = client.get("/api/estadisticas/camaras").json()
     assert everything == [

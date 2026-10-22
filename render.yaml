@@ -13,6 +13,10 @@ services:
         sync: false
       - key: IOT_API_KEY
         generateValue: true
+      - key: SESSION_SECRET
+        sync: false
+      - key: SESSION_COOKIE_SAMESITE
+        value: none
       - key: FRONTEND_ORIGINS
         sync: false
       - key: TIMEZONE

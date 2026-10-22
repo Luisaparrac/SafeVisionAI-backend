@@ -119,6 +119,7 @@ class EventPresenter:
             camera=camera.name,
             date=local.date().isoformat(),
             time=local.strftime("%H:%M:%S"),
+            occurred_at=local.isoformat(timespec="seconds"),
             priority=event_type.priority.value,
             status=event.status.label.value,
             description=event.description,

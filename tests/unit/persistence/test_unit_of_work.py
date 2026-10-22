@@ -72,7 +72,14 @@ def test_repositories_share_the_session_of_the_block(factory):
     with uow:
         sessions = {
             repo._session
-            for repo in (uow.events, uow.alerts, uow.event_types, uow.cameras, uow.catalog)
+            for repo in (
+                uow.events,
+                uow.alerts,
+                uow.event_types,
+                uow.cameras,
+                uow.catalog,
+                uow.users,
+            )
         }
     assert sessions == {factory.sessions[0]}
 

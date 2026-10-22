@@ -4,7 +4,8 @@ API REST de SafeVision AI, escrita en Python con FastAPI. Recibe las detecciones
 del módulo IoT (cámara con YOLO Pose), las guarda como eventos y alertas en la
 base PostgreSQL del equipo y sirve al panel web los eventos, las alertas
 pendientes en orden de urgencia, métricas, estadísticas y catálogos. Las alertas
-nuevas también llegan al panel en vivo por WebSocket.
+nuevas también llegan al panel en vivo por WebSocket. El panel inicia sesión con
+los usuarios de la base y una cookie firmada.
 
 Proyecto del curso **Estructuras de Datos**: la cola de alertas, el historial
 reciente y la ventana de deduplicación usan estructuras implementadas a mano.
@@ -22,8 +23,8 @@ src/safevision/
 │   └── structures/  Heap con índice, lista doble acotada y cola enlazada
 ├── application/     Casos de uso, puertos (typing.Protocol) y servicios en memoria
 ├── adapters/
-│   ├── inbound/http/        FastAPI: rutas, esquemas, seguridad, WebSocket, middlewares
-│   └── outbound/persistence/ SQLAlchemy: modelos ORM, mappers, repositorios, unidad de trabajo
+│   ├── inbound/http/        FastAPI: rutas, esquemas, sesiones, seguridad, WebSocket, middlewares
+│   └── outbound/            SQLAlchemy (ORM, mappers, repositorios, unidad de trabajo), reloj y PBKDF2
 ├── config/settings.py      Configuración desde variables de entorno (falla al arrancar si falta algo)
 └── bootstrap.py            Raíz de composición: conecta cada puerto con su adaptador
 ```
@@ -31,7 +32,8 @@ src/safevision/
 - **domain** no importa FastAPI, Pydantic ni SQLAlchemy; una prueba de
   arquitectura (`tests/architecture`) lo verifica recorriendo los imports.
 - **application** define lo que necesita del exterior como puertos
-  (`EventRepository`, `UnitOfWork`, `Clock`, `AlertNotifier`, `ReadinessProbe`)
+  (`EventRepository`, `UserRepository`, `UnitOfWork`, `Clock`, `PasswordHasher`,
+  `AlertNotifier`, `ReadinessProbe`)
   y orquesta el dominio en un caso de uso por archivo.
 - **adapters** implementan esos puertos (PostgreSQL, reloj del sistema,
   WebSocket) y exponen los casos de uso por HTTP.
@@ -44,7 +46,7 @@ El detalle, con diagramas, está en [docs/arquitectura.md](docs/arquitectura.md)
 |---|---|---|
 | Max-heap con índice de posiciones | `domain/structures/alert_priority_queue.py` | Alertas pendientes: primero la más severa y, si empatan, la más antigua. Quitar la de un evento revisado cuesta O(log n). |
 | Lista doblemente enlazada acotada | `domain/structures/event_history.py` | Historial reciente de eventos (`/api/eventos/recientes`). Insertar, descartar el más antiguo y actualizar por id cuestan O(1). |
-| Cola FIFO enlazada | `domain/structures/linked_queue.py` | Ventana deslizante del deduplicador de detecciones repetidas del IoT. |
+| Cola FIFO enlazada | `domain/structures/linked_queue.py` | Ventanas deslizantes del deduplicador de detecciones repetidas del IoT y del límite de inicios de sesión fallidos. |
 
 La base de datos es la fuente de verdad: estas estructuras son índices en
 memoria que se reconstruyen desde ella al arrancar. La justificación y las
@@ -84,6 +86,10 @@ docker compose up --build
 
 - API en http://localhost:8000 y documentación interactiva en http://localhost:8000/docs.
 - La clave del módulo IoT es la de `.env.compose` (`IOT_API_KEY`).
+- El usuario de ejemplo (`dev@example.com`) no tiene un hash válido: para
+  iniciar sesión, genera uno (ver [Cuentas del panel](#cuentas-del-panel)) y
+  aplícalo con
+  `docker compose exec db psql -U safevision -d safevision_dev -c "UPDATE users SET password_hash = '<hash>' WHERE email = 'dev@example.com'"`.
 - `docker compose down --volumes` borra la base local; al volver a subir se
   cargan otra vez el esquema y los datos de ejemplo.
 
@@ -97,7 +103,7 @@ python -m venv .venv
 .venv\Scripts\activate                 # macOS/Linux: source .venv/bin/activate
 pip install -r requirements-dev.txt    # app + herramientas de desarrollo
 copy .env.example .env                 # macOS/Linux: cp .env.example .env
-# Edita .env: DATABASE_URL e IOT_API_KEY (ver "Variables de entorno")
+# Edita .env: DATABASE_URL, IOT_API_KEY y SESSION_SECRET (ver "Variables de entorno")
 uvicorn safevision.adapters.inbound.http.app:app --app-dir src --reload
 ```
 
@@ -126,15 +132,39 @@ marcadores.
 | Variable | Obligatoria | Valor por defecto | Descripción |
 |---|---|---|---|
 | `DATABASE_URL` | Sí | — | URL de PostgreSQL, por ejemplo `postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require`. Los caracteres especiales de la contraseña van codificados (`!` → `%21`). `postgres://` también se acepta. |
-| `IOT_API_KEY` | Sí | — | Clave que el módulo IoT envía en `X-API-Key` para crear eventos y actualizar cámaras. Usa un valor largo y aleatorio. |
-| `FRONTEND_ORIGINS` | No | `http://localhost:5173` | Orígenes permitidos por CORS, separados por comas. |
+| `IOT_API_KEY` | Sí | — | Clave que el módulo IoT envía en `X-API-Key` para crear eventos y actualizar cámaras (también lee los catálogos). Usa un valor largo y aleatorio. |
+| `SESSION_SECRET` | Sí | — | Clave que firma las cookies de sesión (HMAC-SHA256). Al menos 32 caracteres aleatorios; cambiarla cierra todas las sesiones. |
+| `FRONTEND_ORIGINS` | No | `http://localhost:5173` | Orígenes del panel, separados por comas: CORS con credenciales y protección CSRF. No admite `*`. |
 | `TIMEZONE` | No | `America/Bogota` | Zona horaria en la que se muestran `date` y `time` y se leen los filtros por fecha. |
 | `HISTORY_CAPACITY` | No | `100` | Eventos que guarda el historial reciente en memoria. |
 | `DEDUP_WINDOW_SECONDS` | No | `60` | Segundos, desde la primera detección, en los que una detección repetida reutiliza el evento. `0` desactiva la deduplicación. |
 | `LOG_LEVEL` | No | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` o `CRITICAL`. |
+| `SESSION_TTL_HOURS` | No | `8` | Horas que dura una sesión desde el inicio de sesión. |
+| `SESSION_COOKIE_SAMESITE` | No | `none` | `none` si el panel llama a la API desde otro sitio; `lax` si el hosting del frontend reescribe `/api` hacia el backend (ver [Integración con el frontend](#integración-con-el-frontend)). |
 
 Las claves nunca aparecen en los registros: un filtro oculta credenciales de
 URLs y valores de campos como `password` o `api_key`.
+
+## Cuentas del panel
+
+Los usuarios son las filas de la tabla `users`; el backend no crea cuentas. La
+contraseña se guarda en `users.password_hash` con PBKDF2-SHA256
+(`pbkdf2_sha256$600000$<sal>$<hash>`). Para asignar o cambiar una contraseña:
+
+```bash
+python scripts/hash_password.py      # la pide dos veces sin mostrarla e imprime el hash
+```
+
+El script no se conecta a ninguna base. El hash se aplica a mano, por ejemplo
+desde pgAdmin:
+
+```sql
+UPDATE users SET password_hash = '<hash>' WHERE user_id = <id>;
+```
+
+Un hash en otro formato nunca valida: esa cuenta recibe 401 hasta que se le
+asigna uno nuevo así. El correo de cada cuenta debe ser único (la columna no lo
+garantiza): si dos usuarios lo comparten, ninguno puede iniciar sesión.
 
 ## Despliegue en Render
 
@@ -150,10 +180,12 @@ despliega **sin Docker**:
 - **Cada push a `main` redespliega producción.** El trabajo se hace en ramas y
   entra a `main` por pull request con "Create a merge commit" (ver
   [CONTRIBUTING.md](CONTRIBUTING.md)).
-- Variables: `DATABASE_URL` se define a mano en el panel de Render
-  (`sync: false`); `IOT_API_KEY` la genera Render y se comparte con el equipo
-  IoT; `FRONTEND_ORIGINS` y `TIMEZONE` completan la configuración. Ninguna se
-  escribe en el repositorio.
+- Variables: `DATABASE_URL` y `SESSION_SECRET` se definen a mano en el panel
+  de Render (`sync: false`); `IOT_API_KEY` la genera Render y se comparte con
+  el equipo IoT; `FRONTEND_ORIGINS`, `TIMEZONE` y `SESSION_COOKIE_SAMESITE`
+  completan la configuración. Ningún secreto se escribe en el repositorio. Sin
+  `SESSION_SECRET` el servicio no arranca: hay que definirla **antes** de
+  desplegar esta versión.
 - Las IP de salida del servicio (en Render: *Connect → Outbound*) deben estar
   permitidas en el firewall de la base.
 - `GET /health/ready` responde 503 si la base no contesta; sirve para
@@ -174,6 +206,10 @@ errores, está en [docs/api.md](docs/api.md) y en `/docs` (OpenAPI).
 |---|---|---|
 | GET | `/health` | Prueba de vida del hosting |
 | GET | `/health/ready` | Comprueba también la base (503 si no responde) |
+| POST | `/api/auth/login` | Iniciar sesión (cookie `sv_session`) |
+| GET | `/api/auth/me` | Usuario actual de la sesión |
+| POST | `/api/auth/logout` | Cerrar sesión |
+| GET | `/api/auth/ws-ticket` | Ticket de 60 s para el WebSocket |
 | GET | `/api/eventos?q=&prioridad=&estado=&camara_id=&desde=&hasta=&limit=&offset=` | Historial de eventos con filtros opcionales |
 | GET | `/api/eventos/recientes?limit=` | Historial reciente (lista doblemente enlazada) |
 | GET | `/api/eventos/{id}` | Detalle de un evento |
@@ -188,6 +224,10 @@ errores, está en [docs/api.md](docs/api.md) y en `/docs` (OpenAPI).
 | GET | `/api/tipos-evento`, `/api/ubicaciones`, `/api/camaras`, `/api/zonas`, `/api/sujetos` | Catálogos de solo lectura |
 | PATCH | `/api/camaras/{id}/estado` (`X-API-Key`) | Módulo IoT: estado de una cámara |
 | WS | `/ws/alertas` | Alertas nuevas y eventos revisados en vivo |
+
+Todas las rutas de `/api`, salvo iniciar y cerrar sesión, exigen la cookie de
+sesión o la `X-API-Key`; las marcadas con `X-API-Key` exigen siempre la clave.
+`/health`, `/health/ready`, `/`, `/docs` y `/openapi.json` son públicas.
 
 Los parámetros que no estaban en la primera versión (`camara_id`, `desde`,
 `hasta`, `limit`, `offset`) son opcionales: sin ellos la respuesta es la misma
@@ -218,7 +258,7 @@ Content-Type: application/json
 - `zone_id` debe pertenecer a la cámara. `description` admite hasta 2000
   caracteres y `evidence_url` hasta 2048; el cuerpo completo, hasta 64 KiB.
 - Responde **201** con el evento (`id, type, subject, location, camera, date,
-  time, priority, status, description`) y crea su alerta con
+  time, occurred_at, priority, status, description`) y crea su alerta con
   `level = severidad del tipo`.
 - Una detección repetida (misma cámara, tipo y sujeto) dentro de
   `DEDUP_WINDOW_SECONDS` responde **201 con el evento ya registrado** y el
@@ -229,7 +269,8 @@ Content-Type: application/json
 
 Estado de una cámara: `PATCH /api/camaras/{id}/estado` con
 `{"status": "disconnected"}` (`active`, `inactive`, `disconnected` o
-`maintenance`) y el mismo encabezado `X-API-Key`.
+`maintenance`) y el mismo encabezado `X-API-Key`. Con esa clave el módulo
+también puede leer los catálogos (`GET /api/camaras`, `/api/tipos-evento`…).
 
 ### Panel: alertas en vivo por WebSocket
 
@@ -245,8 +286,57 @@ Al conectarse a `/ws/alertas` el panel recibe mensajes JSON:
   `/api/eventos/{id}`.
 - `ping` llega tras 25 s sin mensajes para mantener viva la conexión. El panel
   debe ignorar los tipos que no conozca y reconectarse si la conexión se cae.
-- No pide clave, igual que las demás rutas de lectura del panel
-  ([ADR 0006](docs/adr/0006-websocket-sin-autenticacion.md)).
+- Se abre con un ticket (`/ws/alertas?ticket=...`, de
+  `GET /api/auth/ws-ticket`), con la cookie de sesión desde un origen del panel
+  o con `X-API-Key`. Sin credenciales se cierra con el código 4401
+  ([ADR 0007](docs/adr/0007-sesion-con-cookie-firmada.md)).
+
+## Integración con el frontend
+
+Contrato completo en [docs/api.md](docs/api.md#autenticación). Lo que el panel
+necesita:
+
+1. **Todas las peticiones con `credentials: "include"`** (ya lo hace). El
+   backend responde `Access-Control-Allow-Credentials: true` y el origen
+   exacto, solo para los orígenes de `FRONTEND_ORIGINS`.
+2. **Formulario de login** → `POST /api/auth/login` con
+   `{"email", "password"}`. 200 trae `{"authenticated": true, "user": {...}}`;
+   401 y 429 traen el mensaje en `detail`.
+3. **Al cargar** → `GET /api/auth/me`: 200 es una sesión válida, 401 muestra
+   el login. Un 401 en cualquier otra ruta significa lo mismo.
+4. **Cerrar sesión** → `POST /api/auth/logout` (204, sin cuerpo).
+5. **WebSocket** → pedir `GET /api/auth/ws-ticket` y abrir
+   `/ws/alertas?ticket=<ticket>` antes de que pasen 60 s; si se cierra con
+   4401, volver al login.
+
+El panel no tiene que enviar ningún token: la cookie es `HttpOnly` y la pone y
+la envía el navegador.
+
+### Opcional: la API bajo el dominio del frontend
+
+Algunos navegadores (Safari, y cualquiera con las cookies de terceros
+bloqueadas) no envían una cookie de otro sitio aunque sea `SameSite=None`. La
+solución es que el hosting del frontend reescriba las rutas del backend bajo su
+propio dominio, para que la cookie sea del mismo sitio. En su archivo de
+configuración de *rewrites*, con `BACKEND_HOST` como marcador:
+
+```json
+{
+  "rewrites": [
+    {"source": "/api/:path*", "destination": "https://BACKEND_HOST/api/:path*"},
+    {"source": "/openapi.json", "destination": "https://BACKEND_HOST/openapi.json"},
+    {"source": "/health", "destination": "https://BACKEND_HOST/health"}
+  ]
+}
+```
+
+Después:
+
+- el panel llama a rutas relativas (`/api/eventos`, `/api/auth/login`…);
+- en el backend, `SESSION_COOKIE_SAMESITE=lax` y `FRONTEND_ORIGINS` con la URL
+  del frontend (las peticiones siguen llegando con su `Origin`);
+- el WebSocket no pasa por la reescritura: sigue usando el ticket contra la URL
+  del backend.
 
 ## Calidad
 
@@ -271,7 +361,8 @@ Al conectarse a `/ws/alertas` el panel recibe mensajes JSON:
   termine en `_test` (si no, fallan sin ejecutar nada); sin la variable se
   omiten. Recrean las tablas de `tests/integration/schema.sql`.
 - `smoke/`: arranca uvicorn con el comando de `render.yaml` y prueba las rutas
-  principales y el WebSocket (`pytest -m smoke`).
+  principales, el inicio y cierre de sesión, CORS con credenciales y el
+  WebSocket (`pytest -m smoke`).
 
 **Integración continua** (`.github/workflows/ci.yml`, en cada push y pull
 request):

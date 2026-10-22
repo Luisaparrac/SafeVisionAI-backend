@@ -15,6 +15,7 @@ from safevision.domain.model.event import Event
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.location import Location
 from safevision.domain.model.subject import Subject
+from safevision.domain.model.user import User
 from safevision.domain.model.zone import Zone
 
 
@@ -155,3 +156,13 @@ class InMemoryCatalogRepository:
         locations, subjects = state
         self.locations.restore(locations)
         self.subjects.restore(subjects)
+
+
+class InMemoryUserRepository(InMemoryStore[User]):
+    def __init__(self) -> None:
+        super().__init__("Usuario")
+
+    def find_by_email(self, email: str) -> list[User]:
+        # Same rule as the SQL repository: lower(trim(email)) = lower(trimmed input).
+        wanted = email.strip().lower()
+        return [user for user in self.all() if user.email.strip().lower() == wanted]

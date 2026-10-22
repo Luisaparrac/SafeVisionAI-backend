@@ -10,7 +10,7 @@ T0 = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
 
 
 def view(event_id: int, status: str = "Pendiente") -> EventView:
-    return EventView(event_id, "Caída", "Rosa", "Casa", "Sala", "", "", "Alto", status, None)
+    return EventView(event_id, "Caída", "Rosa", "Casa", "Sala", "", "", "", "Alto", status, None)
 
 
 def entry(event_id: int, severity: int, minutes: int = 0) -> AlertEntry:

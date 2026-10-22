@@ -8,7 +8,7 @@ estructuras son un índice en memoria que se reconstruye al arrancar.
 |---|---|---|
 | Cola de prioridad (max-heap con índice de posiciones) | `alert_priority_queue.py` | Ordena las alertas pendientes: primero la de mayor severidad y, si empatan, la más antigua. |
 | Lista doblemente enlazada acotada | `event_history.py` | Historial de los eventos más recientes, del más nuevo al más antiguo. |
-| Cola FIFO enlazada | `linked_queue.py` | Ventana deslizante del deduplicador de detecciones (`application/services/event_deduplicator.py`). |
+| Cola FIFO enlazada | `linked_queue.py` | Ventanas deslizantes del deduplicador de detecciones (`application/services/event_deduplicator.py`) y del límite de intentos de inicio de sesión (`application/services/login_throttle.py`). |
 
 ## Cola de prioridad de alertas
 

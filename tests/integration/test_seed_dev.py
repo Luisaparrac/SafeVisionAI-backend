@@ -23,9 +23,15 @@ def client(pg_clean):
     with pg_clean.begin() as connection:
         for statement in sql_statements(SEED):
             connection.exec_driver_sql(statement)
-    settings = Settings(database_url="postgresql://test:test@localhost/test", iot_api_key="k")
+    settings = Settings(
+        database_url="postgresql://test:test@localhost/test",
+        iot_api_key="k",
+        session_secret="test-session-secret-0123456789abcdef",
+    )
     uow = SqlAlchemyUnitOfWork(make_session_factory(pg_clean))
-    with TestClient(create_app(build_container(settings, uow, SystemClock()))) as client:
+    app = create_app(build_container(settings, uow, SystemClock()))
+    # The sample user has no valid password hash; the IoT key also reads the panel routes.
+    with TestClient(app, headers={"X-API-Key": "k"}) as client:
         yield client
 
 

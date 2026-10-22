@@ -1,6 +1,6 @@
 # ADR 0006: WebSocket de alertas sin autenticación
 
-- **Estado:** aceptada
+- **Estado:** sustituida por [ADR 0007](0007-sesion-con-cookie-firmada.md)
 - **Fecha:** 2026-10-16
 
 ## Contexto
