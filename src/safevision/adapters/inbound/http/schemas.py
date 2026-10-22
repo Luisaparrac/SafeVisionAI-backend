@@ -78,7 +78,7 @@ class EventIn(BaseModel):
             "examples": [
                 {
                     "camera_id": 1,
-                    "event_type": "Caída",
+                    "event_type": "Fall",
                     "subject_id": 1,
                     "zone_id": 1,
                     "detected_class": "person",
@@ -93,7 +93,10 @@ class EventIn(BaseModel):
 
     camera_id: int
     event_type_id: int | None = None
-    event_type: str | None = Field(None, description="Nombre del tipo, alternativa a event_type_id")
+    event_type: str | None = Field(
+        None,
+        description="Nombre del tipo como en /api/tipos-evento; alternativa a event_type_id",
+    )
     subject_id: int | None = None
     zone_id: int | None = None
     detected_class: Literal["person", "dog", "cat", "other_animal"] = "person"

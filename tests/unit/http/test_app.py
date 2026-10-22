@@ -52,7 +52,8 @@ def test_openapi_has_examples_for_the_iot_requests(client):
     schemas = client.get("/openapi.json").json()["components"]["schemas"]
     event_examples = schemas["EventIn"]["examples"]
     status_examples = schemas["CameraStatusIn"]["examples"]
-    assert event_examples[0]["event_type"] == "Caída"
+    # Names of the real catalog (event_types), not translations.
+    assert event_examples[0]["event_type"] == "Fall"
     assert status_examples == [{"status": "disconnected"}]
     # The examples are valid requests.
     for example in event_examples:
