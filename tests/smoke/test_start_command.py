@@ -66,6 +66,7 @@ def server(pg_seeded, tmp_path):
     env = os.environ | {
         "DATABASE_URL": pg_seeded.url.render_as_string(hide_password=False),
         "IOT_API_KEY": KEY,
+        "SESSION_SECRET": "smoke-session-secret-0123456789abcdef",
         "FRONTEND_ORIGINS": "http://localhost:5173",
         "TIMEZONE": "America/Bogota",
         "PORT": str(port),

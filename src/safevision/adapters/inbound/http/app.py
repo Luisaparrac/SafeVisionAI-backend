@@ -79,8 +79,8 @@ def create_app(container: Container) -> FastAPI:
 def create_app_from_env() -> FastAPI:
     """Production entry point: settings from the environment (and from .env when present).
 
-    Only DATABASE_URL and IOT_API_KEY are required; if either is missing the
-    process stops here instead of answering requests.
+    Only DATABASE_URL, IOT_API_KEY and SESSION_SECRET are required; if one is
+    missing or invalid the process stops here instead of answering requests.
     """
     from dotenv import load_dotenv
 

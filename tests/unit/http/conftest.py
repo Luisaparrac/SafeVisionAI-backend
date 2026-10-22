@@ -16,6 +16,7 @@ def settings() -> Settings:
     return Settings(
         database_url="postgresql://test:test@localhost/test",
         iot_api_key="test-key",
+        session_secret="test-session-secret-0123456789abcdef",
         frontend_origins=("http://localhost:5173",),
     )
 

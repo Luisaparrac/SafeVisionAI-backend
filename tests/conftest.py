@@ -9,6 +9,7 @@ import os
 
 os.environ["DATABASE_URL"] = "postgresql://test:test@localhost/test"
 os.environ["IOT_API_KEY"] = "test-key"
+os.environ["SESSION_SECRET"] = "test-session-secret-0123456789abcdef"
 os.environ["FRONTEND_ORIGINS"] = "http://localhost:5173"
 os.environ["TIMEZONE"] = "America/Bogota"
 

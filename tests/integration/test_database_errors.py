@@ -17,7 +17,11 @@ def test_unreachable_database_answers_503(pg_engine):
     # A port where nothing listens: every query fails to connect.
     url = pg_engine.url.set(port=1, query={"connect_timeout": "2"})
     engine = make_engine(url.render_as_string(hide_password=False))
-    settings = Settings(database_url="postgresql://test:test@localhost/test", iot_api_key="k")
+    settings = Settings(
+        database_url="postgresql://test:test@localhost/test",
+        iot_api_key="k",
+        session_secret="test-session-secret-0123456789abcdef",
+    )
     uow = SqlAlchemyUnitOfWork(make_session_factory(engine))
     client = TestClient(create_app(build_container(settings, uow, SystemClock())))
     response = client.get("/api/eventos")  # without the startup rebuild, which would fail
