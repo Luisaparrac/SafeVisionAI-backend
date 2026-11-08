@@ -161,3 +161,20 @@ def test_the_limit_counts_the_edge_address_not_the_fake_list(anonymous):
         assert attempt(**edge, **{"X-Forwarded-For": f"198.51.100.{fake}"}) == 403
     assert attempt(**edge, **{"X-Forwarded-For": "198.51.100.77"}) == 429
     assert attempt(**{"CF-Connecting-IP": "203.0.113.6"}) == 403
+
+
+@pytest.mark.parametrize("origin", ["https://evil.example", "null"])
+def test_a_foreign_origin_is_refused(anonymous, uow, origin):
+    response = anonymous.post("/api/auth/register", json=BODY, headers={"Origin": origin})
+    assert (response.status_code, response.json()) == (403, {"detail": "Origen no permitido"})
+    assert uow.users.find_by_email("eva@example.com") == []
+
+
+def test_no_origin_is_accepted_like_the_login(container):
+    from fastapi.testclient import TestClient
+
+    from safevision.adapters.inbound.http.app import create_app
+
+    with TestClient(create_app(container), base_url="https://testserver") as client:
+        assert "origin" not in client.headers
+        assert register(client).status_code == 201

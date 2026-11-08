@@ -17,6 +17,7 @@ from safevision.adapters.inbound.http.schemas import (
 from safevision.adapters.inbound.http.security import (
     client_address,
     ensure_trusted_origin,
+    reject_foreign_origin,
     require_session,
 )
 from safevision.adapters.inbound.http.sessions import (
@@ -108,7 +109,10 @@ def ws_ticket(
     response_model=SessionOut,
     summary="Crear cuenta",
     responses={
-        403: {"description": "Registro no habilitado o código de invitación inválido"},
+        403: {
+            "description": "Registro no habilitado, código de invitación inválido "
+            "u origen no permitido"
+        },
         409: {"description": "Ya existe una cuenta con ese correo"},
         422: {"description": "Nombre, correo o contraseña no cumplen las reglas"},
         429: {"description": "5 intentos de registro desde esa dirección en una hora"},
@@ -126,6 +130,7 @@ def register(
     REGISTRATION_MODE decides who can register: nobody, whoever has the
     invitation code, or anyone.
     """
+    reject_foreign_origin(request, container)
     user = container.register_user.execute(data.to_registration(), client_address(request))
     container.sessions.start(response, user)
     return SessionOut.from_view(user)

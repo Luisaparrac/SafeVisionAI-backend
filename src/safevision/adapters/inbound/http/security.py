@@ -105,6 +105,15 @@ def ensure_trusted_origin(request: Request, container: Container) -> None:
         raise HTTPException(403, UNTRUSTED_ORIGIN)
 
 
+def reject_foreign_origin(request: Request, container: Container) -> None:
+    """Routes that open a session: there is none to protect yet, so no Origin is required.
+
+    Clients that are not browsers send no Origin; when one comes, it must be trusted.
+    """
+    if "origin" in request.headers and not _trusted_origin(request.headers, container):
+        raise HTTPException(403, UNTRUSTED_ORIGIN)
+
+
 def _trusted_origin(headers: Mapping[str, str], container: Container) -> bool:
     origin = headers.get("origin") or _origin_of(headers.get("referer"))
     if origin is None:
