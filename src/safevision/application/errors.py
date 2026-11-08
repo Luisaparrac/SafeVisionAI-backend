@@ -61,6 +61,10 @@ class EmailAlreadyRegisteredError(AccountError):
     message = "Ya existe una cuenta con ese correo"
 
 
+class InvalidResetTokenError(AccountError):
+    message = "El enlace no es válido o expiró"
+
+
 class PasswordRecoveryUnavailableError(AccountError):
     message = "La recuperación de contraseña no está disponible"
 

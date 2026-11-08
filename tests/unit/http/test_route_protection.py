@@ -20,6 +20,7 @@ OPEN = {
     ("POST", "/api/auth/logout"),
     ("POST", "/api/auth/register"),
     ("POST", "/api/auth/password/forgot"),
+    ("POST", "/api/auth/password/reset"),
 }
 # Only the IoT module calls these; a panel session is not enough.
 IOT_ONLY = {("POST", "/api/eventos"), ("PATCH", "/api/camaras/{camera_id}/estado")}

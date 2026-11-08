@@ -13,6 +13,7 @@ from safevision.adapters.inbound.http.schemas import (
     LoginIn,
     MessageOut,
     RegisterIn,
+    ResetPasswordIn,
     SessionOut,
     WsTicketOut,
 )
@@ -166,3 +167,25 @@ def forgot_password(
     container.request_password_reset.accept(data.email, client_address(request))
     tasks.add_task(container.request_password_reset.deliver, data.email)
     return MessageOut(detail=RESET_REQUESTED)
+
+
+@router.post(
+    "/password/reset",
+    status_code=204,
+    response_class=Response,
+    summary="Restablecer la contraseña",
+    responses={
+        400: {"description": "El enlace no es válido, expiró o ya se usó"},
+        422: {"description": "La contraseña nueva no cumple la política"},
+        429: {"description": "10 intentos desde esa dirección en una hora"},
+    },
+)
+def reset_password(
+    data: ResetPasswordIn, request: Request, container: Container = Depends(get_container)
+) -> Response:
+    """Saves the new password and ends the sessions opened with the previous one.
+
+    It does not open a session: the user logs in with the new password.
+    """
+    container.reset_password.execute(data.token, data.new_password, client_address(request))
+    return Response(status_code=204)

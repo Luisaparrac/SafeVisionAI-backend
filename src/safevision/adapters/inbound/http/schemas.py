@@ -268,6 +268,17 @@ class ForgotPasswordIn(BaseModel):
     email: str = Field(max_length=MAX_EMAIL_LENGTH)
 
 
+class ResetPasswordIn(BaseModel):
+    """The password has no limit here so that the policy answers with its own message."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"token": "<token>", "new_password": "contraseña1"}]}
+    )
+
+    token: str
+    new_password: str
+
+
 class MessageOut(BaseModel):
     detail: str
 

@@ -146,6 +146,14 @@ class UserRepository(Protocol):
         """Stores a new user and returns it with its assigned id."""
         ...
 
+    def replace_password_hash(self, user_id: int, current: str, new: str) -> bool:
+        """Sets ``new`` only if the stored hash is still ``current``; whether it did.
+
+        The check and the change are one statement, so of two simultaneous
+        requests with the same reset link only one can succeed.
+        """
+        ...
+
     def lock_email(self, email: str) -> None:
         """Serializes, until the end of the transaction, whoever creates that e-mail.
 

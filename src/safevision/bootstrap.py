@@ -44,6 +44,7 @@ from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoa
 from safevision.application.use_cases.register_event import RegisterEvent
 from safevision.application.use_cases.register_user import RegisterUser
 from safevision.application.use_cases.request_password_reset import RequestPasswordReset
+from safevision.application.use_cases.reset_password import ResetPassword
 from safevision.application.use_cases.review_event import ReviewEvent
 from safevision.application.use_cases.update_camera_status import UpdateCameraStatus
 from safevision.config.settings import Settings
@@ -53,6 +54,7 @@ FAILED_LOGINS = (5, timedelta(minutes=15))
 REGISTRATIONS_PER_CLIENT = (5, timedelta(hours=1))
 RESET_REQUESTS_PER_CLIENT = (10, timedelta(hours=1))
 RESET_REQUESTS_PER_EMAIL = (3, timedelta(hours=1))
+RESET_ATTEMPTS_PER_CLIENT = (10, timedelta(hours=1))
 
 
 class AlwaysReady:
@@ -131,6 +133,12 @@ def build_container(
             settings.password_reset_ttl_minutes,
             SlidingWindowLimiter(clock.now, *RESET_REQUESTS_PER_CLIENT),
             SlidingWindowLimiter(clock.now, *RESET_REQUESTS_PER_EMAIL),
+        ),
+        reset_password=ResetPassword(
+            uow,
+            hasher,
+            reset_tokens,
+            SlidingWindowLimiter(clock.now, *RESET_ATTEMPTS_PER_CLIENT),
         ),
     )
 

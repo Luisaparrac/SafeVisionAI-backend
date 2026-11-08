@@ -4,7 +4,7 @@ Each repository works on the session of the current unit of work: it flushes
 its changes so ids and constraints are checked at once, but never commits.
 """
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.orm import Session
 
 from safevision.adapters.outbound.persistence import mappers
@@ -67,6 +67,15 @@ class SqlAlchemyUserRepository:
         self._session.add(row)
         self._session.flush()
         return mappers.user_to_domain(row)
+
+    def replace_password_hash(self, user_id: int, current: str, new: str) -> bool:
+        statement = (
+            update(UserRow)
+            .where(UserRow.user_id == user_id, UserRow.password_hash == current)
+            .values(password_hash=new)
+            .execution_options(synchronize_session=False)
+        )
+        return self._session.execute(statement).rowcount == 1
 
     def lock_email(self, email: str) -> None:
         # An advisory lock is not DDL: PostgreSQL releases it when the transaction ends.

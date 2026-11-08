@@ -65,3 +65,13 @@ def test_lock_email_waits_for_the_transaction_that_holds_it(pg_seeded, session, 
     session.rollback()  # ends the transaction, which releases the lock
     with Session(pg_seeded) as other, other.begin():
         SqlAlchemyUserRepository(other).lock_email("eva@example.com")
+
+
+def test_replace_password_hash_needs_the_current_one(repo):
+    assert repo.replace_password_hash(2, "otro", "nuevo") is False
+    assert repo.get(2).password_hash == "hash-ana"
+    assert repo.replace_password_hash(2, "hash-ana", "nuevo") is True
+    assert repo.replace_password_hash(2, "hash-ana", "otra-vez") is False
+    assert repo.get(2).password_hash == "nuevo"
+    assert repo.get(3).password_hash == "hash-otra"
+    assert repo.replace_password_hash(99, "x", "nuevo") is False
