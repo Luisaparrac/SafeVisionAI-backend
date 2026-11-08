@@ -130,3 +130,34 @@ def test_open_mode_needs_no_code(settings, uow, clock):
             json={"name": "Eva Ruiz", "email": "eva@example.com", "password": "clave123"},
         )
     assert response.status_code == 201
+
+
+def test_six_attempts_from_one_address_answer_429(anonymous):
+    for _ in range(5):
+        assert register(anonymous, invitation_code="mal").status_code == 403
+    response = register(anonymous)
+    assert (response.status_code, response.json()) == (
+        429,
+        {"detail": "Demasiadas solicitudes. Intenta de nuevo más tarde."},
+    )
+
+
+def test_the_limit_ends_after_an_hour(anonymous, clock):
+    for _ in range(5):
+        register(anonymous, invitation_code="mal")
+    assert register(anonymous).status_code == 429
+    clock.advance(3600)
+    assert register(anonymous).status_code == 201
+
+
+def test_the_limit_counts_the_edge_address_not_the_fake_list(anonymous):
+    def attempt(**headers):
+        return anonymous.post(
+            "/api/auth/register", json=BODY | {"invitation_code": "mal"}, headers=headers
+        ).status_code
+
+    edge = {"CF-Connecting-IP": "203.0.113.5"}
+    for fake in range(5):
+        assert attempt(**edge, **{"X-Forwarded-For": f"198.51.100.{fake}"}) == 403
+    assert attempt(**edge, **{"X-Forwarded-For": "198.51.100.77"}) == 429
+    assert attempt(**{"CF-Connecting-IP": "203.0.113.6"}) == 403

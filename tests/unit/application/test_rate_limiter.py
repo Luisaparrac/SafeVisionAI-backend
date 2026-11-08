@@ -1,4 +1,5 @@
 import random
+import threading
 from datetime import timedelta
 
 import pytest
@@ -87,3 +88,32 @@ def test_matches_a_brute_force_count():
             clock.advance(rng.choice([1, 5, 20]))
         recent = [t for t in history.get(email, []) if clock.now() - t < timedelta(seconds=50)]
         assert throttle.is_blocked(email) == (len(recent) >= 3)
+
+
+def test_try_acquire_counts_until_the_limit(throttle):
+    assert [throttle.try_acquire("a") for _ in range(6)] == [True] * 5 + [False]
+    assert throttle.is_blocked("a")
+    assert throttle.try_acquire("b")
+
+
+def test_try_acquire_does_not_count_refused_uses(clock):
+    limiter = SlidingWindowLimiter(clock.now, 1, timedelta(seconds=10))
+    assert limiter.try_acquire("a")
+    clock.advance(9)
+    assert not limiter.try_acquire("a")  # must not extend the block
+    clock.advance(1)
+    assert limiter.try_acquire("a")
+
+
+def test_try_acquire_is_atomic(clock):
+    limiter = SlidingWindowLimiter(clock.now, 50, timedelta(hours=1))
+    results: list[bool] = []
+    threads = [
+        threading.Thread(target=lambda: results.append(limiter.try_acquire("a")))
+        for _ in range(200)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sum(results) == 50

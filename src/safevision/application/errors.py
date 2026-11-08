@@ -57,6 +57,10 @@ class EmailAlreadyRegisteredError(AccountError):
     message = "Ya existe una cuenta con ese correo"
 
 
+class TooManyRequestsError(AccountError):
+    message = "Demasiadas solicitudes. Intenta de nuevo más tarde."
+
+
 class TooManyLoginAttemptsError(Exception):
     """Too many failed logins for one e-mail in a short time."""
 

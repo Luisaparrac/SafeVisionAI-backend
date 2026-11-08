@@ -13,9 +13,11 @@ from safevision.application.errors import (
     EmailAlreadyRegisteredError,
     InvalidInvitationCodeError,
     RegistrationClosedError,
+    TooManyRequestsError,
 )
 from safevision.application.ports.password_hasher import PasswordHasher
 from safevision.application.ports.unit_of_work import UnitOfWork
+from safevision.application.services.rate_limiter import SlidingWindowLimiter
 from safevision.application.use_cases.authenticate_user import to_view
 from safevision.domain.model.account import (
     ensure_valid_email,
@@ -39,20 +41,33 @@ class Registration:
 
 class RegisterUser:
     def __init__(
-        self, uow: UnitOfWork, hasher: PasswordHasher, mode: str, invitation_code: str
+        self,
+        uow: UnitOfWork,
+        hasher: PasswordHasher,
+        mode: str,
+        invitation_code: str,
+        per_client: SlidingWindowLimiter,
     ) -> None:
         self._uow = uow
         self._hasher = hasher
         self.mode = mode
         self._invitation_code = invitation_code
+        self._per_client = per_client
 
-    def execute(self, registration: Registration) -> UserView:
+    def execute(self, registration: Registration, client: str) -> UserView:
+        """``client`` is the address the limit counts by; it is never stored or logged.
+
+        Every attempt with valid data counts, also the refused ones, because this
+        limit is what stops guessing the code or probing which e-mails exist.
+        """
         if self.mode == CLOSED:
             raise RegistrationClosedError()
         email = normalize_email(registration.email)
         ensure_valid_name(registration.name)
         ensure_valid_email(email)
         ensure_valid_password(registration.password)
+        if not self._per_client.try_acquire(client):
+            raise TooManyRequestsError()
         if self.mode == INVITE and not self._code_matches(registration.invitation_code):
             raise InvalidInvitationCodeError()
         self._ensure_email_is_free(email)

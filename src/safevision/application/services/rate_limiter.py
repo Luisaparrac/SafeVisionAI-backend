@@ -55,17 +55,34 @@ class SlidingWindowLimiter:
         with self._lock:
             now = self._clock()
             self._expire(now)
-            if key in self._counts:
-                generation, uses = self._counts[key]
-            else:
-                self._generation += 1
-                generation, uses = self._generation, 0
-            self._counts[key] = (generation, uses + 1)
-            self._uses.enqueue((key, generation, now))
+            self._add_use(key, now)
+
+    def try_acquire(self, key: str) -> bool:
+        """Counts one more use unless the key is blocked; False when it is refused.
+
+        Checking and counting happen under the same lock, so simultaneous
+        requests cannot get past the limit.
+        """
+        with self._lock:
+            now = self._clock()
+            self._expire(now)
+            if self._counts.get(key, (0, 0))[1] >= self._limit:
+                return False
+            self._add_use(key, now)
+            return True
 
     def clear(self, key: str) -> None:
         with self._lock:
             self._counts.pop(key, None)
+
+    def _add_use(self, key: str, now: datetime) -> None:
+        if key in self._counts:
+            generation, uses = self._counts[key]
+        else:
+            self._generation += 1
+            generation, uses = self._generation, 0
+        self._counts[key] = (generation, uses + 1)
+        self._uses.enqueue((key, generation, now))
 
     def _expire(self, now: datetime) -> None:
         while self._uses and now - self._uses.peek()[2] >= self._window:

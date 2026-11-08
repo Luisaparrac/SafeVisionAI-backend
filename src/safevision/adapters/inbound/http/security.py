@@ -1,6 +1,7 @@
 """Protection of the endpoints: X-API-Key for the IoT module, session cookie for the panel."""
 
 import hmac
+import ipaddress
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
@@ -34,6 +35,23 @@ def require_iot_key(
     """
     if not _key_matches(x_api_key, container):
         raise HTTPException(401, "X-API-Key inválida")
+
+
+def client_address(request: Request) -> str:
+    """The address the rate limits count by. It only lives in memory: it is never logged.
+
+    The server sits behind proxies, so the connection itself shows the proxy for
+    every visitor. CF-Connecting-IP is overwritten by the edge in front of the
+    hosting platform; the last entry of X-Forwarded-For is added by the nearest
+    proxy. The first entries of that list are sent by the client and can be faked.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "").rsplit(",", 1)[-1]
+    for candidate in (request.headers.get("cf-connecting-ip", ""), forwarded):
+        try:
+            return str(ipaddress.ip_address(candidate.strip()))
+        except ValueError:
+            continue
+    return request.client.host if request.client else "unknown"
 
 
 def _key_matches(provided: str | None, container: Container) -> bool:

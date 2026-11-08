@@ -14,7 +14,11 @@ from safevision.adapters.inbound.http.schemas import (
     SessionOut,
     WsTicketOut,
 )
-from safevision.adapters.inbound.http.security import ensure_trusted_origin, require_session
+from safevision.adapters.inbound.http.security import (
+    client_address,
+    ensure_trusted_origin,
+    require_session,
+)
 from safevision.adapters.inbound.http.sessions import (
     SESSION_COOKIE,
     WS_TICKET,
@@ -107,10 +111,14 @@ def ws_ticket(
         403: {"description": "Registro no habilitado o código de invitación inválido"},
         409: {"description": "Ya existe una cuenta con ese correo"},
         422: {"description": "Nombre, correo o contraseña no cumplen las reglas"},
+        429: {"description": "5 intentos de registro desde esa dirección en una hora"},
     },
 )
 def register(
-    data: RegisterIn, response: Response, container: Container = Depends(get_container)
+    data: RegisterIn,
+    request: Request,
+    response: Response,
+    container: Container = Depends(get_container),
 ) -> SessionOut:
     """Creates the account in the users table and opens its session.
 
@@ -118,6 +126,6 @@ def register(
     REGISTRATION_MODE decides who can register: nobody, whoever has the
     invitation code, or anyone.
     """
-    user = container.register_user.execute(data.to_registration())
+    user = container.register_user.execute(data.to_registration(), client_address(request))
     container.sessions.start(response, user)
     return SessionOut.from_view(user)

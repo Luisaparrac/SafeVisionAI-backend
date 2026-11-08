@@ -21,6 +21,7 @@ from safevision.application.errors import (
     StorageConflictError,
     StorageUnavailableError,
     TooManyLoginAttemptsError,
+    TooManyRequestsError,
 )
 from safevision.domain.errors import (
     DomainError,
@@ -79,6 +80,7 @@ STATUS_BY_ACCOUNT_ERROR: dict[type[AccountError], int] = {
     RegistrationClosedError: 403,
     InvalidInvitationCodeError: 403,
     EmailAlreadyRegisteredError: 409,
+    TooManyRequestsError: 429,
 }
 
 

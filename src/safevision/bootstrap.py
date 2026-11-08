@@ -45,6 +45,7 @@ from safevision.config.settings import Settings
 
 # Uses allowed per key and the window they are counted in.
 FAILED_LOGINS = (5, timedelta(minutes=15))
+REGISTRATIONS_PER_CLIENT = (5, timedelta(hours=1))
 
 
 class AlwaysReady:
@@ -104,7 +105,11 @@ def build_container(
         ),
         get_session_user=GetSessionUser(uow),
         register_user=RegisterUser(
-            uow, hasher, settings.effective_registration_mode, settings.registration_code
+            uow,
+            hasher,
+            settings.effective_registration_mode,
+            settings.registration_code,
+            SlidingWindowLimiter(clock.now, *REGISTRATIONS_PER_CLIENT),
         ),
     )
 
