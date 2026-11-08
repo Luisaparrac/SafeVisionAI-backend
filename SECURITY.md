@@ -21,7 +21,7 @@ corrección.
 
 ## Secretos del servicio
 
-El backend usa tres secretos. Ninguno se escribe en el repositorio: viven en las
+El backend usa estos secretos. Ninguno se escribe en el repositorio: viven en las
 variables de entorno de Render y en el `.env` local de cada desarrollador, que
 está en `.gitignore`.
 
@@ -29,7 +29,9 @@ está en `.gitignore`.
 |---|---|---|
 | Credenciales de la base | `DATABASE_URL` | El backend |
 | Clave del módulo IoT | `IOT_API_KEY` | El backend y el dispositivo IoT |
-| Clave de las sesiones | `SESSION_SECRET` | Solo el backend |
+| Clave de las sesiones y de los enlaces de recuperación | `SESSION_SECRET` | Solo el backend |
+| Código de invitación (opcional) | `REGISTRATION_CODE` | Quien reparte las invitaciones |
+| Clave del proveedor de correo (opcional) | `BREVO_API_KEY` | Solo el backend |
 
 Las contraseñas de los usuarios del panel no son secretos del servicio: se
 guardan en la base como hashes PBKDF2 (nunca en texto) y se generan con
@@ -39,8 +41,14 @@ guardan en la base como hashes PBKDF2 (nunca en texto) y se generan con
 
 1. Genera un valor nuevo de al menos 32 caracteres aleatorios.
 2. Actualiza la variable en Render. Al reiniciar, **todas las sesiones se
-   cierran** y los usuarios deben volver a iniciar sesión. Es también la forma
-   de cerrar de golpe una sesión robada.
+   cierran** y **los enlaces de recuperación pendientes dejan de valer**. Es
+   también la forma de cerrar de golpe una sesión robada.
+
+### Rotación de `REGISTRATION_CODE` y `BREVO_API_KEY`
+
+Cambia el valor en Render; el servicio se reinicia con el nuevo. El código de
+invitación anterior deja de servir y las cuentas ya creadas no se ven afectadas.
+Revoca la clave anterior de Brevo en su panel.
 
 ### Rotación de `IOT_API_KEY`
 
@@ -75,11 +83,19 @@ registros del servicio por usos indebidos.
   `Secure` y firmada con HMAC-SHA256, contraseñas con PBKDF2-SHA256 (600 000
   iteraciones), mismo mensaje y tiempo similar ante cualquier fallo del login y
   límite de 5 fallos por correo en 15 minutos.
+- Registro restringido por defecto (código de invitación comparado en tiempo
+  constante) y límite de 5 intentos por dirección y hora
+  ([ADR 0008](docs/adr/0008-registro-y-recuperacion-sin-tabla.md)).
+- Recuperación de contraseña con enlaces firmados de propósito propio, válidos
+  una sola vez y por poco tiempo. La respuesta y su tiempo no revelan si el
+  correo existe, y cambiar la contraseña invalida las sesiones anteriores.
 - Protección CSRF: los cambios hechos con la cookie exigen un `Origin` de
   `FRONTEND_ORIGINS` o del propio backend; el WebSocket con cookie también.
 - El usuario de la base solo lee y escribe filas: el backend nunca ejecuta DDL.
 - Registros sin datos sensibles: se ocultan credenciales de URLs y valores de
-  claves; no se guarda la IP del cliente ni la cadena de consulta.
+  claves; no se guarda la IP del cliente ni la cadena de consulta. Contraseñas,
+  enlaces, códigos de invitación y correos nunca se registran; la dirección del
+  cliente solo se usa en memoria para los límites.
 - Errores de base de datos e inesperados sin detalles internos.
 - Cabeceras `X-Content-Type-Options`, `X-Frame-Options` y `Referrer-Policy`;
   CORS con credenciales limitado a `FRONTEND_ORIGINS` (no admite `*`).
@@ -89,10 +105,15 @@ registros del servicio por usos indebidos.
 ## Limitaciones conocidas
 
 - Una sesión no se puede revocar en el servidor antes de que expire
-  (`SESSION_TTL_HOURS`): no hay tabla de sesiones. Borrar al usuario o rotar
-  `SESSION_SECRET` la invalida.
-- El límite de intentos de inicio de sesión vive en memoria: se reinicia con el
-  servicio y es por proceso.
+  (`SESSION_TTL_HOURS`): no hay tabla de sesiones. Borrar al usuario, cambiar su
+  contraseña o rotar `SESSION_SECRET` la invalida.
+- Los límites de intentos viven en memoria: se reinician con el servicio y son
+  por proceso.
+- `POST /api/auth/register` responde 409 si el correo ya existe, así que permite
+  averiguarlo; lo frenan el código de invitación y el límite por dirección.
+- Cualquiera puede agotar las 3 solicitudes de recuperación por hora de un correo
+  ajeno.
+- El registro no verifica que el correo sea de quien lo escribe.
 - No hay roles: todo usuario con sesión ve y revisa todos los eventos.
-- Registro, verificación de correo, recuperación de contraseña y OAuth son
-  mejoras futuras: requieren cambios en la base o servicios externos.
+- La verificación de correo y OAuth son mejoras futuras: requieren cambios en la
+  base o servicios externos.
