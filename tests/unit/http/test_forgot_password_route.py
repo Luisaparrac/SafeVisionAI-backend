@@ -89,3 +89,27 @@ def test_openapi_describes_the_route(anonymous):
     operation = anonymous.get("/openapi.json").json()["paths"]["/api/auth/password/forgot"]["post"]
     assert operation["summary"] == "Solicitar enlace para restablecer la contraseña"
     assert {"202", "503"} <= set(operation["responses"])
+
+
+TOO_MANY = {"detail": "Demasiadas solicitudes. Intenta de nuevo más tarde."}
+
+
+def test_fourth_request_for_one_email_answers_429_even_if_it_does_not_exist(anonymous):
+    for email in (TEST_EMAIL, "nadie@example.com"):
+        for _ in range(3):
+            assert forgot(anonymous, email).status_code == 202
+        response = forgot(anonymous, email)
+        assert (response.status_code, response.json()) == (429, TOO_MANY)
+
+
+def test_eleventh_request_from_one_address_answers_429(anonymous, outbox):
+    for number in range(10):
+        assert forgot(anonymous, f"persona{number}@example.com").status_code == 202
+    response = forgot(anonymous, TEST_EMAIL)
+    assert (response.status_code, response.json()) == (429, TOO_MANY)
+    assert outbox.sent == []
+
+
+def test_openapi_documents_the_limit(anonymous):
+    operation = anonymous.get("/openapi.json").json()["paths"]["/api/auth/password/forgot"]["post"]
+    assert "429" in operation["responses"]

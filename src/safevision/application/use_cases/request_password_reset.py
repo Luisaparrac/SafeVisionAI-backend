@@ -9,10 +9,11 @@ import html
 import logging
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
-from safevision.application.errors import PasswordRecoveryUnavailableError
+from safevision.application.errors import PasswordRecoveryUnavailableError, TooManyRequestsError
 from safevision.application.ports.email_sender import EmailMessage, EmailSender
 from safevision.application.ports.password_reset_tokens import PasswordResetTokens
 from safevision.application.ports.unit_of_work import UnitOfWork
+from safevision.application.services.rate_limiter import SlidingWindowLimiter
 from safevision.domain.model.account import is_valid_email, normalize_email
 from safevision.domain.model.identity import require_id
 
@@ -29,20 +30,32 @@ class RequestPasswordReset:
         sender: EmailSender | None,
         reset_url: str,
         lifetime_minutes: int,
+        per_client: SlidingWindowLimiter,
+        per_email: SlidingWindowLimiter,
     ) -> None:
         self._uow = uow
         self._tokens = tokens
         self._sender = sender
         self._reset_url = reset_url
         self._lifetime_minutes = lifetime_minutes
+        self._per_client = per_client
+        self._per_email = per_email
 
     @property
     def available(self) -> bool:
         return self._sender is not None
 
-    def accept(self) -> None:
+    def accept(self, email: str, client: str) -> None:
+        """Counts every request by address and by e-mail, registered or not.
+
+        ``client`` is only a key in memory: it is never stored or logged.
+        """
         if not self.available:
             raise PasswordRecoveryUnavailableError()
+        if not self._per_client.try_acquire(client):
+            raise TooManyRequestsError()
+        if not self._per_email.try_acquire(normalize_email(email)):
+            raise TooManyRequestsError()
 
     def deliver(self, email: str) -> None:
         """Never raises: nobody is waiting, and an error could carry the address."""

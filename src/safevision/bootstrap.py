@@ -51,6 +51,8 @@ from safevision.config.settings import Settings
 # Uses allowed per key and the window they are counted in.
 FAILED_LOGINS = (5, timedelta(minutes=15))
 REGISTRATIONS_PER_CLIENT = (5, timedelta(hours=1))
+RESET_REQUESTS_PER_CLIENT = (10, timedelta(hours=1))
+RESET_REQUESTS_PER_EMAIL = (3, timedelta(hours=1))
 
 
 class AlwaysReady:
@@ -127,6 +129,8 @@ def build_container(
             email_sender,
             settings.password_reset_url,
             settings.password_reset_ttl_minutes,
+            SlidingWindowLimiter(clock.now, *RESET_REQUESTS_PER_CLIENT),
+            SlidingWindowLimiter(clock.now, *RESET_REQUESTS_PER_EMAIL),
         ),
     )
 

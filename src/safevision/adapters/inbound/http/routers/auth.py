@@ -147,10 +147,14 @@ def register(
     status_code=202,
     response_model=MessageOut,
     summary="Solicitar enlace para restablecer la contraseña",
-    responses={503: {"description": "La recuperación de contraseña no está configurada"}},
+    responses={
+        429: {"description": "3 solicitudes por correo o 10 por dirección en una hora"},
+        503: {"description": "La recuperación de contraseña no está configurada"},
+    },
 )
 def forgot_password(
     data: ForgotPasswordIn,
+    request: Request,
     tasks: BackgroundTasks,
     container: Container = Depends(get_container),
 ) -> MessageOut:
@@ -159,6 +163,6 @@ def forgot_password(
     The e-mail is searched and sent after the answer, so the time does not
     reveal it either.
     """
-    container.request_password_reset.accept()
+    container.request_password_reset.accept(data.email, client_address(request))
     tasks.add_task(container.request_password_reset.deliver, data.email)
     return MessageOut(detail=RESET_REQUESTED)

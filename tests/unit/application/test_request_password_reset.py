@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 import pytest
 
@@ -7,12 +8,14 @@ from safevision.adapters.outbound.signed_password_reset_tokens import (
     SignedPasswordResetTokens,
 )
 from safevision.adapters.outbound.token_signer import TokenSigner
-from safevision.application.errors import PasswordRecoveryUnavailableError
+from safevision.application.errors import PasswordRecoveryUnavailableError, TooManyRequestsError
+from safevision.application.services.rate_limiter import SlidingWindowLimiter
 from safevision.application.use_cases.request_password_reset import (
     RequestPasswordReset,
     reset_link,
 )
 from safevision.domain.model.user import User
+from tests.fakes.clock import FakeClock
 from tests.fakes.email import CapturingEmailSender, FailingEmailSender
 from tests.fakes.users import TEST_EMAIL, TEST_FINGERPRINT
 
@@ -30,11 +33,22 @@ def outbox() -> CapturingEmailSender:
     return CapturingEmailSender()
 
 
-def build(uow, signer, sender, minutes=30):
-    from datetime import timedelta
+HOUR = timedelta(hours=1)
+IP = "198.51.100.7"
 
+
+def build(uow, signer, sender, minutes=30, clock=None):
+    now = (clock or FakeClock()).now
     tokens = SignedPasswordResetTokens(signer, timedelta(minutes=minutes))
-    return RequestPasswordReset(uow, tokens, sender, URL, minutes)
+    return RequestPasswordReset(
+        uow,
+        tokens,
+        sender,
+        URL,
+        minutes,
+        SlidingWindowLimiter(now, 10, HOUR),
+        SlidingWindowLimiter(now, 3, HOUR),
+    )
 
 
 @pytest.fixture
@@ -47,7 +61,7 @@ def token_of(message) -> str:
 
 
 def test_sends_the_link_to_the_registered_user(recovery, outbox, signer):
-    recovery.accept()
+    recovery.accept(TEST_EMAIL, IP)
     recovery.deliver(f"  {TEST_EMAIL.upper()} ")
     [message] = outbox.sent
     assert message.to == TEST_EMAIL
@@ -97,7 +111,7 @@ def test_without_a_sender_it_is_unavailable(uow, signer):
     recovery = build(uow, signer, None)
     assert not recovery.available
     with pytest.raises(PasswordRecoveryUnavailableError) as error:
-        recovery.accept()
+        recovery.accept(TEST_EMAIL, IP)
     assert error.value.message == "La recuperación de contraseña no está disponible"
     recovery.deliver(TEST_EMAIL)  # harmless
 
@@ -132,3 +146,38 @@ def test_a_database_failure_does_not_escape(signer, caplog):
 )
 def test_reset_link(base, expected):
     assert reset_link(base, "a.b-c_d") == expected
+
+
+def test_three_requests_per_email(recovery):
+    for spelling in (TEST_EMAIL, TEST_EMAIL.upper(), f" {TEST_EMAIL}"):
+        recovery.accept(spelling, IP)
+    with pytest.raises(TooManyRequestsError):
+        recovery.accept(TEST_EMAIL, "203.0.113.9")
+
+
+def test_ten_requests_per_address(recovery):
+    for number in range(10):
+        recovery.accept(f"persona{number}@example.com", IP)
+    with pytest.raises(TooManyRequestsError):
+        recovery.accept("otra@example.com", IP)
+    recovery.accept("otra@example.com", "203.0.113.9")
+
+
+def test_an_address_over_its_limit_does_not_use_the_count_of_the_email(recovery):
+    for number in range(10):
+        recovery.accept(f"persona{number}@example.com", IP)
+    for _ in range(5):
+        with pytest.raises(TooManyRequestsError):
+            recovery.accept(TEST_EMAIL, IP)
+    for _ in range(3):
+        recovery.accept(TEST_EMAIL, "203.0.113.9")
+
+
+def test_limits_end_after_an_hour(uow, signer, outbox, clock):
+    recovery = build(uow, signer, outbox, clock=clock)
+    for _ in range(3):
+        recovery.accept(TEST_EMAIL, IP)
+    with pytest.raises(TooManyRequestsError):
+        recovery.accept(TEST_EMAIL, IP)
+    clock.advance(3600)
+    recovery.accept(TEST_EMAIL, IP)
