@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 SAME_SITE_VALUES = ("none", "lax")
+REGISTRATION_MODES = ("closed", "invite", "open")
 # HMAC-SHA256 keys shorter than this are easy to guess offline from one signed cookie.
 MIN_SESSION_SECRET_LENGTH = 32
 
@@ -31,6 +32,10 @@ class Settings:
     API from another site; "lax" is enough when the frontend proxies the API
     under its own domain. Browsers only accept "none" on Secure cookies, which
     the session cookie always is.
+
+    ``registration_mode`` defaults to "invite": there are no roles, so every
+    account sees all the data. Without ``registration_code`` the invite mode
+    behaves as "closed" (see ``effective_registration_mode``).
     """
 
     database_url: str = field(repr=False)
@@ -43,6 +48,8 @@ class Settings:
     log_level: str = "INFO"
     session_ttl_hours: float = 8.0
     session_cookie_samesite: str = "none"
+    registration_mode: str = "invite"
+    registration_code: str = field(default="", repr=False)
 
     def __post_init__(self) -> None:
         for name in ("database_url", "iot_api_key", "session_secret"):
@@ -71,6 +78,16 @@ class Settings:
             raise ConfigurationError(
                 f"SESSION_COOKIE_SAMESITE debe ser uno de {', '.join(SAME_SITE_VALUES)}"
             )
+        if self.registration_mode not in REGISTRATION_MODES:
+            raise ConfigurationError(
+                f"REGISTRATION_MODE debe ser uno de {', '.join(REGISTRATION_MODES)}"
+            )
+
+    @property
+    def effective_registration_mode(self) -> str:
+        if self.registration_mode == "invite" and not self.registration_code:
+            return "closed"
+        return self.registration_mode
 
     @property
     def tzinfo(self) -> ZoneInfo:
@@ -106,6 +123,9 @@ class Settings:
             session_ttl_hours=number("SESSION_TTL_HOURS", float),
             session_cookie_samesite=text("SESSION_COOKIE_SAMESITE").lower()
             or defaults["session_cookie_samesite"].default,
+            registration_mode=text("REGISTRATION_MODE").lower()
+            or defaults["registration_mode"].default,
+            registration_code=text("REGISTRATION_CODE"),
         )
 
 

@@ -38,6 +38,7 @@ from safevision.application.use_cases.mark_alert_seen import MarkAlertSeen
 from safevision.application.use_cases.mark_false_alarm import MarkFalseAlarm
 from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoard
 from safevision.application.use_cases.register_event import RegisterEvent
+from safevision.application.use_cases.register_user import RegisterUser
 from safevision.application.use_cases.review_event import ReviewEvent
 from safevision.application.use_cases.update_camera_status import UpdateCameraStatus
 from safevision.config.settings import Settings
@@ -102,6 +103,9 @@ def build_container(
             uow, hasher, SlidingWindowLimiter(clock.now, *FAILED_LOGINS)
         ),
         get_session_user=GetSessionUser(uow),
+        register_user=RegisterUser(
+            uow, hasher, settings.effective_registration_mode, settings.registration_code
+        ),
     )
 
 

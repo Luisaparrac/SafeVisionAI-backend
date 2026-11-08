@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from safevision.application.dto import AlertView, EventView, Metrics, UserView
 from safevision.application.use_cases.register_event import RegisterEventCommand
+from safevision.application.use_cases.register_user import Registration
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.location import Location
@@ -234,6 +235,31 @@ class LoginIn(BaseModel):
 
     email: str = Field(max_length=MAX_EMAIL_LENGTH)
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class RegisterIn(BaseModel):
+    """Lengths and formats are rules of the domain, so they answer with its messages."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "Usuario de ejemplo",
+                    "email": "usuario@example.com",
+                    "password": "contraseña1",
+                    "invitation_code": "código",
+                }
+            ]
+        }
+    )
+
+    name: str
+    email: str
+    password: str
+    invitation_code: str | None = None
+
+    def to_registration(self) -> Registration:
+        return Registration(**self.model_dump())
 
 
 class UserOut(BaseModel):

@@ -161,6 +161,10 @@ class InMemoryCatalogRepository:
 class InMemoryUserRepository(InMemoryStore[User]):
     def __init__(self) -> None:
         super().__init__("Usuario")
+        self.locked_emails: list[str] = []
+
+    def lock_email(self, email: str) -> None:
+        self.locked_emails.append(email)
 
     def find_by_email(self, email: str) -> list[User]:
         # Same rule as the SQL repository: lower(trim(email)) = lower(trimmed input).

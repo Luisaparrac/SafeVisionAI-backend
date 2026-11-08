@@ -36,6 +36,27 @@ class InvalidCredentialsError(Exception):
         super().__init__(self.message)
 
 
+class AccountError(Exception):
+    """A request about an account was refused; ``message`` is safe to show."""
+
+    message = "No se pudo completar la solicitud"
+
+    def __init__(self) -> None:
+        super().__init__(self.message)
+
+
+class RegistrationClosedError(AccountError):
+    message = "El registro de cuentas no está habilitado"
+
+
+class InvalidInvitationCodeError(AccountError):
+    message = "Código de invitación inválido"
+
+
+class EmailAlreadyRegisteredError(AccountError):
+    message = "Ya existe una cuenta con ese correo"
+
+
 class TooManyLoginAttemptsError(Exception):
     """Too many failed logins for one e-mail in a short time."""
 

@@ -62,6 +62,17 @@ class SqlAlchemyUserRepository:
         row = self._session.get(UserRow, user_id)
         return None if row is None else mappers.user_to_domain(row)
 
+    def add(self, user: User) -> User:
+        row = mappers.user_to_row(user)
+        self._session.add(row)
+        self._session.flush()
+        return mappers.user_to_domain(row)
+
+    def lock_email(self, email: str) -> None:
+        # An advisory lock is not DDL: PostgreSQL releases it when the transaction ends.
+        key = func.hashtextextended(email.strip().lower(), 0)
+        self._session.execute(select(func.pg_advisory_xact_lock(key)))
+
     def find_by_email(self, email: str) -> list[User]:
         rows = self._session.scalars(
             select(UserRow)

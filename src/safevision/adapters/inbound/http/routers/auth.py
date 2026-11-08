@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
-from safevision.adapters.inbound.http.schemas import LoginIn, SessionOut, WsTicketOut
+from safevision.adapters.inbound.http.schemas import (
+    LoginIn,
+    RegisterIn,
+    SessionOut,
+    WsTicketOut,
+)
 from safevision.adapters.inbound.http.security import ensure_trusted_origin, require_session
 from safevision.adapters.inbound.http.sessions import (
     SESSION_COOKIE,
@@ -91,3 +96,28 @@ def ws_ticket(
         user.id, WS_TICKET, WS_TICKET_LIFETIME, user.password_fingerprint
     )
     return WsTicketOut(ticket=ticket, expires_in=int(WS_TICKET_LIFETIME.total_seconds()))
+
+
+@router.post(
+    "/register",
+    status_code=201,
+    response_model=SessionOut,
+    summary="Crear cuenta",
+    responses={
+        403: {"description": "Registro no habilitado o código de invitación inválido"},
+        409: {"description": "Ya existe una cuenta con ese correo"},
+        422: {"description": "Nombre, correo o contraseña no cumplen las reglas"},
+    },
+)
+def register(
+    data: RegisterIn, response: Response, container: Container = Depends(get_container)
+) -> SessionOut:
+    """Creates the account in the users table and opens its session.
+
+    The answer has the shape of the login and leaves the session cookie.
+    REGISTRATION_MODE decides who can register: nobody, whoever has the
+    invitation code, or anyone.
+    """
+    user = container.register_user.execute(data.to_registration())
+    container.sessions.start(response, user)
+    return SessionOut.from_view(user)

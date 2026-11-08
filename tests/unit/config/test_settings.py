@@ -22,6 +22,29 @@ def test_defaults_when_only_required_variables_are_set():
     assert settings.session_secret == SECRET
     assert settings.session_ttl_hours == 8.0
     assert settings.session_cookie_samesite == "none"
+    assert settings.registration_mode == "invite"
+    assert settings.registration_code == ""
+    assert settings.effective_registration_mode == "closed"
+
+
+def test_registration_settings():
+    settings = Settings.from_env(
+        REQUIRED | {"REGISTRATION_MODE": " Invite ", "REGISTRATION_CODE": " abc "}
+    )
+    assert settings.registration_mode == "invite"
+    assert settings.registration_code == "abc"
+    assert settings.effective_registration_mode == "invite"
+    assert "abc" not in repr(settings)
+
+
+@pytest.mark.parametrize("mode", ["closed", "open"])
+def test_other_registration_modes_are_kept(mode):
+    assert Settings.from_env(REQUIRED | {"REGISTRATION_MODE": mode}).registration_mode == mode
+
+
+def test_unknown_registration_mode_stops_the_application():
+    with pytest.raises(ConfigurationError, match="REGISTRATION_MODE"):
+        Settings.from_env(REQUIRED | {"REGISTRATION_MODE": "a-veces"})
 
 
 def test_every_variable_is_read():

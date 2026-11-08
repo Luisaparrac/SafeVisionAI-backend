@@ -31,6 +31,7 @@ from safevision.application.use_cases.mark_alert_seen import MarkAlertSeen
 from safevision.application.use_cases.mark_false_alarm import MarkFalseAlarm
 from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoard
 from safevision.application.use_cases.register_event import RegisterEvent
+from safevision.application.use_cases.register_user import RegisterUser
 from safevision.application.use_cases.review_event import ReviewEvent
 from safevision.application.use_cases.update_camera_status import UpdateCameraStatus
 
@@ -68,3 +69,4 @@ class Container:
     list_subjects: ListSubjects
     authenticate_user: AuthenticateUser
     get_session_user: GetSessionUser
+    register_user: RegisterUser
