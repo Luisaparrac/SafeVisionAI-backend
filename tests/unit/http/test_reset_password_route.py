@@ -73,7 +73,7 @@ def test_invalid_links(anonymous, bad):
 
 
 def test_a_token_with_broken_unicode_is_an_invalid_link(anonymous):
-    body = b'{"token": "a.\ud800", "new_password": "clave-nueva-1"}'
+    body = rb'{"token": "a.\ud800", "new_password": "clave-nueva-1"}'
     headers = {"Content-Type": "application/json"}
     response = anonymous.post("/api/auth/password/reset", content=body, headers=headers)
     assert (response.status_code, response.json()) == (400, BAD_LINK)
