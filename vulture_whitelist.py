@@ -16,6 +16,7 @@ me
 logout
 ws_ticket
 forgot_password
+auth_options
 
 # Pydantic reads these class attributes to build and serialize the models.
 model_config
@@ -26,6 +27,8 @@ alto
 authenticated
 expires_in
 detail
+registration
+password_recovery
 
 # Parameters of protocol (port) methods and of __exit__, which only declare a signature.
 exc_type

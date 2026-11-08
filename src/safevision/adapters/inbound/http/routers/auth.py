@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
 from safevision.adapters.inbound.http.schemas import (
+    AuthOptionsOut,
     ForgotPasswordIn,
     LoginIn,
     MessageOut,
@@ -189,3 +190,19 @@ def reset_password(
     """
     container.reset_password.execute(data.token, data.new_password, client_address(request))
     return Response(status_code=204)
+
+
+@router.get(
+    "/options",
+    response_model=AuthOptionsOut,
+    summary="Opciones de autenticación disponibles",
+)
+def auth_options(container: Container = Depends(get_container)) -> AuthOptionsOut:
+    """Which account actions this deployment allows; it is public and reveals no account.
+
+    An invite mode without a configured code is reported as "closed", as it behaves.
+    """
+    return AuthOptionsOut(
+        registration=container.register_user.mode,
+        password_recovery=container.request_password_reset.available,
+    )

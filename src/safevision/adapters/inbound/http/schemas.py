@@ -279,6 +279,13 @@ class ResetPasswordIn(BaseModel):
     new_password: str
 
 
+class AuthOptionsOut(BaseModel):
+    """What the panel may offer; lets it show or hide its buttons."""
+
+    registration: Literal["closed", "invite", "open"]
+    password_recovery: bool
+
+
 class MessageOut(BaseModel):
     detail: str
 
