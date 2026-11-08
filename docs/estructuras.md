@@ -279,7 +279,7 @@ reloj se inyecta, así las pruebas controlan el tiempo con un reloj falso.
 
 ## 5. Límite de intentos de inicio de sesión: cola + diccionario
 
-Archivo: `application/services/login_throttle.py` (`LoginThrottle`).
+Archivo: `application/services/rate_limiter.py` (`SlidingWindowLimiter`).
 
 ### Problema
 

@@ -5,7 +5,7 @@ because the column is not unique. Every failure raises the same error and,
 when no user matches, the password is still checked against a throwaway hash,
 so neither the message nor the response time tells whether the e-mail exists.
 
-Failures are counted per e-mail (``LoginThrottle``): after too many, that
+Failures are counted per e-mail (``SlidingWindowLimiter``): after too many, that
 e-mail is refused for a while without checking anything, which stops guessing
 passwords one after another.
 """
@@ -16,13 +16,15 @@ from safevision.application.dto import UserView
 from safevision.application.errors import InvalidCredentialsError, TooManyLoginAttemptsError
 from safevision.application.ports.password_hasher import PasswordHasher
 from safevision.application.ports.unit_of_work import UnitOfWork
-from safevision.application.services.login_throttle import LoginThrottle
+from safevision.application.services.rate_limiter import SlidingWindowLimiter
 from safevision.domain.model.identity import require_id
 from safevision.domain.model.user import User
 
 
 class AuthenticateUser:
-    def __init__(self, uow: UnitOfWork, hasher: PasswordHasher, throttle: LoginThrottle) -> None:
+    def __init__(
+        self, uow: UnitOfWork, hasher: PasswordHasher, throttle: SlidingWindowLimiter
+    ) -> None:
         self._uow = uow
         self._hasher = hasher
         self._throttle = throttle
@@ -39,7 +41,7 @@ class AuthenticateUser:
         user = matches[0] if len(matches) == 1 else None
         encoded = user.password_hash if user is not None else self._throwaway_hash()
         if not self._hasher.verify(password, encoded) or user is None:
-            self._throttle.record_failure(normalized)
+            self._throttle.record(normalized)
             raise InvalidCredentialsError()
         self._throttle.clear(normalized)
         return to_view(user)
