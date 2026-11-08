@@ -27,6 +27,53 @@ def test_defaults_when_only_required_variables_are_set():
     assert settings.effective_registration_mode == "closed"
     assert settings.password_reset_url == ""
     assert settings.password_reset_ttl_minutes == 30
+    assert settings.email_provider == "disabled"
+    assert settings.mail_from_name == "SafeVision AI"
+
+
+BREVO = REQUIRED | {
+    "EMAIL_PROVIDER": "Brevo",
+    "BREVO_API_KEY": "clave-ficticia",
+    "MAIL_FROM_EMAIL": "avisos@example.com",
+    "PASSWORD_RESET_URL": "https://panel.example.com/restablecer",
+}
+
+
+def test_brevo_settings():
+    settings = Settings.from_env(BREVO | {"MAIL_FROM_NAME": "Avisos"})
+    assert settings.email_provider == "brevo"
+    assert settings.mail_from_name == "Avisos"
+    assert "clave-ficticia" not in repr(settings)
+
+
+@pytest.mark.parametrize("name", ["BREVO_API_KEY", "MAIL_FROM_EMAIL", "PASSWORD_RESET_URL"])
+def test_brevo_needs_its_variables(name):
+    with pytest.raises(ConfigurationError, match=f"{name} es obligatoria"):
+        Settings.from_env({k: v for k, v in BREVO.items() if k != name})
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://panel.example.com/restablecer",
+        "panel.example.com/restablecer",
+        "https://",
+        "https://panel.example.com/#/restablecer",
+    ],
+)
+def test_brevo_needs_an_https_reset_url(url):
+    with pytest.raises(ConfigurationError, match="PASSWORD_RESET_URL"):
+        Settings.from_env(BREVO | {"PASSWORD_RESET_URL": url})
+
+
+def test_brevo_needs_a_valid_sender():
+    with pytest.raises(ConfigurationError, match="MAIL_FROM_EMAIL"):
+        Settings.from_env(BREVO | {"MAIL_FROM_EMAIL": "no-es-correo"})
+
+
+def test_unknown_email_provider_stops_the_application():
+    with pytest.raises(ConfigurationError, match="EMAIL_PROVIDER"):
+        Settings.from_env(REQUIRED | {"EMAIL_PROVIDER": "smtp"})
 
 
 def test_password_reset_settings():

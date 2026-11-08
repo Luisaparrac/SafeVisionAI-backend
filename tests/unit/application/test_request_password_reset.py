@@ -105,7 +105,7 @@ def test_without_a_sender_it_is_unavailable(uow, signer):
 def test_a_delivery_failure_is_logged_without_the_address(uow, signer, caplog):
     with caplog.at_level(logging.ERROR):
         build(uow, signer, FailingEmailSender()).deliver(TEST_EMAIL)
-    assert "RuntimeError" in caplog.text
+    assert "EmailDeliveryError" in caplog.text
     assert TEST_EMAIL not in caplog.text
 
 

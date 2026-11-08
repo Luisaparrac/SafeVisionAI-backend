@@ -1,5 +1,6 @@
 """E-mail senders for tests: nothing here talks to a real provider."""
 
+from safevision.application.errors import EmailDeliveryError
 from safevision.application.ports.email_sender import EmailMessage
 
 
@@ -13,4 +14,4 @@ class CapturingEmailSender:
 
 class FailingEmailSender:
     def send(self, message: EmailMessage) -> None:
-        raise RuntimeError(f"sin entrega a {message.to}")
+        raise EmailDeliveryError(f"sin entrega a {message.to}")

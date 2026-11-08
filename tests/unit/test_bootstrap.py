@@ -1,13 +1,21 @@
 """The composition root wires every use case around shared adapters."""
 
+from dataclasses import replace
+
 from safevision.adapters.inbound.http.container import Container
+from safevision.adapters.outbound.brevo_email_sender import BrevoEmailSender
 from safevision.adapters.outbound.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from safevision.adapters.outbound.system_clock import SystemClock
 from safevision.application.use_cases.register_event import RegisterEventCommand
-from safevision.bootstrap import build_container, build_production_container
+from safevision.bootstrap import (
+    build_container,
+    build_production_container,
+    configured_email_sender,
+)
 from safevision.config.settings import Settings
 from tests.fakes.catalog import seed_reference_catalog
 from tests.fakes.clock import FakeClock
+from tests.fakes.email import CapturingEmailSender
 from tests.fakes.unit_of_work import FakeUnitOfWork
 
 SETTINGS = Settings(
@@ -80,3 +88,25 @@ def test_window_counts_from_the_first_detection():
         assert container.register_event.execute(command).view.id == first
     clock.advance(5)
     assert container.register_event.execute(command).created is True
+
+
+def test_password_recovery_is_disabled_by_default():
+    assert configured_email_sender(SETTINGS) is None
+    assert not build_production_container(SETTINGS).request_password_reset.available
+
+
+def test_brevo_is_used_when_configured():
+    brevo = replace(
+        SETTINGS,
+        email_provider="brevo",
+        brevo_api_key="clave-ficticia",
+        mail_from_email="avisos@example.com",
+        password_reset_url="https://panel.example.com/restablecer",
+    )
+    assert isinstance(configured_email_sender(brevo), BrevoEmailSender)
+    assert build_production_container(brevo).request_password_reset.available
+
+
+def test_a_given_sender_replaces_the_configured_one():
+    container = build_production_container(SETTINGS, email_sender=CapturingEmailSender())
+    assert container.request_password_reset.available

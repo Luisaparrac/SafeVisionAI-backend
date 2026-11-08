@@ -36,6 +36,10 @@ class InvalidCredentialsError(Exception):
         super().__init__(self.message)
 
 
+class EmailDeliveryError(Exception):
+    """The e-mail provider did not accept the message."""
+
+
 class AccountError(Exception):
     """A request about an account was refused; ``message`` is safe to show."""
 

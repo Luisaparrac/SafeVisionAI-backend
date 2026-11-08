@@ -5,6 +5,7 @@ from datetime import timedelta
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.sessions import SessionPolicy
 from safevision.adapters.inbound.http.websocket import AlertBroadcaster
+from safevision.adapters.outbound.brevo_email_sender import BrevoEmailSender
 from safevision.adapters.outbound.pbkdf2_password_hasher import Pbkdf2PasswordHasher
 from safevision.adapters.outbound.persistence.database import make_engine, make_session_factory
 from safevision.adapters.outbound.persistence.readiness import DatabaseReadinessProbe
@@ -130,8 +131,27 @@ def build_container(
     )
 
 
-def build_production_container(settings: Settings) -> Container:
-    """PostgreSQL and the system clock. No connection is opened until the first query."""
+def configured_email_sender(settings: Settings) -> EmailSender | None:
+    if settings.email_provider != "brevo":
+        return None
+    return BrevoEmailSender(
+        settings.brevo_api_key, settings.mail_from_email, settings.mail_from_name
+    )
+
+
+def build_production_container(
+    settings: Settings, email_sender: EmailSender | None = None
+) -> Container:
+    """PostgreSQL and the system clock. No connection is opened until the first query.
+
+    ``email_sender`` replaces the configured provider (the smoke test uses it).
+    """
     engine = make_engine(settings.database_url)
     uow = SqlAlchemyUnitOfWork(make_session_factory(engine))
-    return build_container(settings, uow, SystemClock(), DatabaseReadinessProbe(engine))
+    return build_container(
+        settings,
+        uow,
+        SystemClock(),
+        DatabaseReadinessProbe(engine),
+        email_sender=email_sender or configured_email_sender(settings),
+    )
