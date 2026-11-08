@@ -57,6 +57,10 @@ class EmailAlreadyRegisteredError(AccountError):
     message = "Ya existe una cuenta con ese correo"
 
 
+class PasswordRecoveryUnavailableError(AccountError):
+    message = "La recuperación de contraseña no está disponible"
+
+
 class TooManyRequestsError(AccountError):
     message = "Demasiadas solicitudes. Intenta de nuevo más tarde."
 

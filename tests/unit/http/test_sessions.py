@@ -4,7 +4,8 @@ from datetime import timedelta
 
 import pytest
 
-from safevision.adapters.inbound.http.sessions import SESSION, TokenClaims, TokenSigner
+from safevision.adapters.inbound.http.sessions import SESSION
+from safevision.adapters.outbound.token_signer import TokenClaims, TokenSigner
 from tests.fakes.clock import FakeClock
 
 SECRET = "test-session-secret-0123456789abcdef"

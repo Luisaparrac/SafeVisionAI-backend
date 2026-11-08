@@ -16,6 +16,7 @@ from safevision.application.errors import (
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
     InvalidInvitationCodeError,
+    PasswordRecoveryUnavailableError,
     PersistenceError,
     RegistrationClosedError,
     StorageConflictError,
@@ -81,6 +82,7 @@ STATUS_BY_ACCOUNT_ERROR: dict[type[AccountError], int] = {
     InvalidInvitationCodeError: 403,
     EmailAlreadyRegisteredError: 409,
     TooManyRequestsError: 429,
+    PasswordRecoveryUnavailableError: 503,
 }
 
 

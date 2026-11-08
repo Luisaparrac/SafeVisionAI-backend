@@ -262,6 +262,16 @@ class RegisterIn(BaseModel):
         return Registration(**self.model_dump())
 
 
+class ForgotPasswordIn(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"email": "usuario@example.com"}]})
+
+    email: str = Field(max_length=MAX_EMAIL_LENGTH)
+
+
+class MessageOut(BaseModel):
+    detail: str
+
+
 class UserOut(BaseModel):
     id: int
     name: str

@@ -4,12 +4,14 @@ The session travels in the ``sv_session`` cookie (see ``sessions``); the
 browser keeps it and sends it back, so the panel never handles the token.
 """
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 
 from safevision.adapters.inbound.http.container import Container
 from safevision.adapters.inbound.http.dependencies import get_container
 from safevision.adapters.inbound.http.schemas import (
+    ForgotPasswordIn,
     LoginIn,
+    MessageOut,
     RegisterIn,
     SessionOut,
     WsTicketOut,
@@ -28,6 +30,10 @@ from safevision.adapters.inbound.http.sessions import (
 from safevision.application.dto import UserView
 
 router = APIRouter(prefix="/api/auth", tags=["autenticación"])
+
+RESET_REQUESTED = (
+    "Si el correo está registrado, recibirás un enlace para restablecer la contraseña."
+)
 
 
 @router.post(
@@ -134,3 +140,25 @@ def register(
     user = container.register_user.execute(data.to_registration(), client_address(request))
     container.sessions.start(response, user)
     return SessionOut.from_view(user)
+
+
+@router.post(
+    "/password/forgot",
+    status_code=202,
+    response_model=MessageOut,
+    summary="Solicitar enlace para restablecer la contraseña",
+    responses={503: {"description": "La recuperación de contraseña no está configurada"}},
+)
+def forgot_password(
+    data: ForgotPasswordIn,
+    tasks: BackgroundTasks,
+    container: Container = Depends(get_container),
+) -> MessageOut:
+    """Answers the same whether the e-mail is registered or not.
+
+    The e-mail is searched and sent after the answer, so the time does not
+    reveal it either.
+    """
+    container.request_password_reset.accept()
+    tasks.add_task(container.request_password_reset.deliver, data.email)
+    return MessageOut(detail=RESET_REQUESTED)

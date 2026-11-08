@@ -25,6 +25,26 @@ def test_defaults_when_only_required_variables_are_set():
     assert settings.registration_mode == "invite"
     assert settings.registration_code == ""
     assert settings.effective_registration_mode == "closed"
+    assert settings.password_reset_url == ""
+    assert settings.password_reset_ttl_minutes == 30
+
+
+def test_password_reset_settings():
+    settings = Settings.from_env(
+        REQUIRED
+        | {
+            "PASSWORD_RESET_URL": "https://panel.example.com/restablecer",
+            "PASSWORD_RESET_TTL_MINUTES": "45",
+        }
+    )
+    assert settings.password_reset_url == "https://panel.example.com/restablecer"
+    assert settings.password_reset_ttl_minutes == 45
+
+
+@pytest.mark.parametrize("value", ["0", "-5"])
+def test_password_reset_lifetime_must_be_positive(value):
+    with pytest.raises(ConfigurationError, match="PASSWORD_RESET_TTL_MINUTES"):
+        Settings.from_env(REQUIRED | {"PASSWORD_RESET_TTL_MINUTES": value})
 
 
 def test_registration_settings():

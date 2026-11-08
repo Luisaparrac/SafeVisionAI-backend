@@ -50,6 +50,8 @@ class Settings:
     session_cookie_samesite: str = "none"
     registration_mode: str = "invite"
     registration_code: str = field(default="", repr=False)
+    password_reset_url: str = ""
+    password_reset_ttl_minutes: int = 30
 
     def __post_init__(self) -> None:
         for name in ("database_url", "iot_api_key", "session_secret"):
@@ -78,6 +80,8 @@ class Settings:
             raise ConfigurationError(
                 f"SESSION_COOKIE_SAMESITE debe ser uno de {', '.join(SAME_SITE_VALUES)}"
             )
+        if self.password_reset_ttl_minutes <= 0:
+            raise ConfigurationError("PASSWORD_RESET_TTL_MINUTES debe ser mayor que cero")
         if self.registration_mode not in REGISTRATION_MODES:
             raise ConfigurationError(
                 f"REGISTRATION_MODE debe ser uno de {', '.join(REGISTRATION_MODES)}"
@@ -126,6 +130,8 @@ class Settings:
             registration_mode=text("REGISTRATION_MODE").lower()
             or defaults["registration_mode"].default,
             registration_code=text("REGISTRATION_CODE"),
+            password_reset_url=text("PASSWORD_RESET_URL"),
+            password_reset_ttl_minutes=number("PASSWORD_RESET_TTL_MINUTES", int),
         )
 
 

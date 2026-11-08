@@ -3,14 +3,17 @@
 from datetime import timedelta
 
 from safevision.adapters.inbound.http.container import Container
-from safevision.adapters.inbound.http.sessions import SessionPolicy, TokenSigner
+from safevision.adapters.inbound.http.sessions import SessionPolicy
 from safevision.adapters.inbound.http.websocket import AlertBroadcaster
 from safevision.adapters.outbound.pbkdf2_password_hasher import Pbkdf2PasswordHasher
 from safevision.adapters.outbound.persistence.database import make_engine, make_session_factory
 from safevision.adapters.outbound.persistence.readiness import DatabaseReadinessProbe
 from safevision.adapters.outbound.persistence.unit_of_work import SqlAlchemyUnitOfWork
+from safevision.adapters.outbound.signed_password_reset_tokens import SignedPasswordResetTokens
 from safevision.adapters.outbound.system_clock import SystemClock
+from safevision.adapters.outbound.token_signer import TokenSigner
 from safevision.application.ports.clock import Clock
+from safevision.application.ports.email_sender import EmailSender
 from safevision.application.ports.password_hasher import PasswordHasher
 from safevision.application.ports.readiness import ReadinessProbe
 from safevision.application.ports.unit_of_work import UnitOfWork
@@ -39,6 +42,7 @@ from safevision.application.use_cases.mark_false_alarm import MarkFalseAlarm
 from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoard
 from safevision.application.use_cases.register_event import RegisterEvent
 from safevision.application.use_cases.register_user import RegisterUser
+from safevision.application.use_cases.request_password_reset import RequestPasswordReset
 from safevision.application.use_cases.review_event import ReviewEvent
 from safevision.application.use_cases.update_camera_status import UpdateCameraStatus
 from safevision.config.settings import Settings
@@ -61,24 +65,29 @@ def build_container(
     clock: Clock,
     readiness: ReadinessProbe | None = None,
     password_hasher: PasswordHasher | None = None,
+    email_sender: EmailSender | None = None,
 ) -> Container:
     """Wires the use cases around one unit of work, one clock and one in-memory board.
 
     ``password_hasher`` defaults to PBKDF2 with its production iterations; tests
-    pass a cheaper one so each login does not take half a second.
+    pass a cheaper one so each login does not take half a second. Without
+    ``email_sender`` the password recovery is reported as unavailable.
     """
     hasher = password_hasher or Pbkdf2PasswordHasher()
     presenter = EventPresenter(settings.tzinfo)
     board = AlertBoard(settings.history_capacity)
     deduplicator = EventDeduplicator(timedelta(seconds=settings.dedup_window_seconds), clock.now)
     broadcaster = AlertBroadcaster()
+    signer = TokenSigner(settings.session_secret, clock.now)
+    reset_lifetime = timedelta(minutes=settings.password_reset_ttl_minutes)
+    reset_tokens = SignedPasswordResetTokens(signer, reset_lifetime)
     return Container(
         iot_api_key=settings.iot_api_key,
         cors_origins=settings.frontend_origins,
         readiness=readiness or AlwaysReady(),
         alert_broadcaster=broadcaster,
         sessions=SessionPolicy(
-            signer=TokenSigner(settings.session_secret, clock.now),
+            signer=signer,
             lifetime=timedelta(hours=settings.session_ttl_hours),
             same_site=settings.session_cookie_samesite,
         ),
@@ -110,6 +119,13 @@ def build_container(
             settings.effective_registration_mode,
             settings.registration_code,
             SlidingWindowLimiter(clock.now, *REGISTRATIONS_PER_CLIENT),
+        ),
+        request_password_reset=RequestPasswordReset(
+            uow,
+            reset_tokens,
+            email_sender,
+            settings.password_reset_url,
+            settings.password_reset_ttl_minutes,
         ),
     )
 
