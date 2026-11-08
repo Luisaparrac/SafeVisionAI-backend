@@ -102,7 +102,9 @@ Un archivo por caso de uso en `application/use_cases`:
 - `EventDeduplicator` descarta las detecciones repetidas del IoT dentro de
   una ventana de tiempo, con una cola enlazada y un diccionario.
 - `SlidingWindowLimiter` cuenta los inicios de sesión fallidos por correo en una
-  ventana de 15 minutos, con la misma combinación de estructuras.
+  ventana de 15 minutos, con la misma combinación de estructuras. La misma
+  clase limita los registros y las solicitudes de recuperación, en ventanas de
+  una hora por dirección o por correo.
 
 ## Flujo de una detección
 

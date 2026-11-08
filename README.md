@@ -141,14 +141,24 @@ marcadores.
 | `LOG_LEVEL` | No | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` o `CRITICAL`. |
 | `SESSION_TTL_HOURS` | No | `8` | Horas que dura una sesión desde el inicio de sesión. |
 | `SESSION_COOKIE_SAMESITE` | No | `none` | `none` si el panel llama a la API desde otro sitio; `lax` si el hosting del frontend reescribe `/api` hacia el backend (ver [Integración con el frontend](#integración-con-el-frontend)). |
+| `REGISTRATION_MODE` | No | `invite` | Quién puede crear una cuenta: `closed` (nadie), `invite` (con el código) u `open` (cualquiera). |
+| `REGISTRATION_CODE` | Solo con `invite` | — | Código de invitación. Sin él, el modo `invite` se comporta como `closed`. |
+| `EMAIL_PROVIDER` | No | `disabled` | `disabled` (la recuperación responde 503) o `brevo`. |
+| `BREVO_API_KEY` | Con `brevo` | — | Clave de la API de Brevo. |
+| `MAIL_FROM_EMAIL` | Con `brevo` | — | Remitente verificado en Brevo. |
+| `MAIL_FROM_NAME` | No | `SafeVision AI` | Nombre del remitente. |
+| `PASSWORD_RESET_URL` | Con `brevo` | — | Página `https` del panel que recibe `?token=...`. No admite fragmento (`#`). |
+| `PASSWORD_RESET_TTL_MINUTES` | No | `30` | Minutos que vale el enlace de recuperación. |
 
 Las claves nunca aparecen en los registros: un filtro oculta credenciales de
 URLs y valores de campos como `password` o `api_key`.
 
 ## Cuentas del panel
 
-Los usuarios son las filas de la tabla `users`; el backend no crea cuentas. La
-contraseña se guarda en `users.password_hash` con PBKDF2-SHA256
+Los usuarios son las filas de la tabla `users`. Se crean con
+`POST /api/auth/register` si `REGISTRATION_MODE` lo permite, o a mano. No hay
+roles: **toda cuenta ve todos los datos**, por eso el registro exige por defecto
+un código de invitación. La contraseña se guarda en `users.password_hash` con PBKDF2-SHA256
 (`pbkdf2_sha256$600000$<sal>$<hash>`). Para asignar o cambiar una contraseña:
 
 ```bash
@@ -165,6 +175,29 @@ UPDATE users SET password_hash = '<hash>' WHERE user_id = <id>;
 Un hash en otro formato nunca valida: esa cuenta recibe 401 hasta que se le
 asigna uno nuevo así. El correo de cada cuenta debe ser único (la columna no lo
 garantiza): si dos usuarios lo comparten, ninguno puede iniciar sesión.
+
+### Configurar la recuperación de contraseña con Brevo
+
+El correo sale por la API HTTPS de Brevo porque el plan gratuito del hosting
+bloquea los puertos SMTP. Sin estas variables la aplicación funciona igual y
+`POST /api/auth/password/forgot` responde 503.
+
+1. Crea una cuenta en Brevo y verifica el remitente (o el dominio).
+2. Genera una clave en *SMTP & API → API Keys*.
+3. Define las variables en el panel del hosting, con tus propios valores:
+
+   ```dotenv
+   EMAIL_PROVIDER=brevo
+   BREVO_API_KEY=<clave de la API>
+   MAIL_FROM_EMAIL=<remitente verificado>
+   MAIL_FROM_NAME=SafeVision AI
+   PASSWORD_RESET_URL=https://<dominio del panel>/<ruta de restablecimiento>
+   ```
+
+Si falta una variable con `EMAIL_PROVIDER=brevo`, o `PASSWORD_RESET_URL` no es
+`https`, el servicio no arranca y el registro indica cuál corregir. Los errores
+del envío se registran solo con el código HTTP. Las pruebas y el CI usan un
+remitente falso: nunca llaman a la API real.
 
 ## Despliegue en Render
 
@@ -183,7 +216,8 @@ despliega **sin Docker**:
 - Variables: `DATABASE_URL` y `SESSION_SECRET` se definen a mano en el panel
   de Render (`sync: false`); `IOT_API_KEY` la genera Render y se comparte con
   el equipo IoT; `FRONTEND_ORIGINS`, `TIMEZONE` y `SESSION_COOKIE_SAMESITE`
-  completan la configuración. Ningún secreto se escribe en el repositorio. Sin
+  completan la configuración. Las variables de registro y correo también van
+  en el panel (`sync: false`) y son opcionales. Ningún secreto se escribe en el repositorio. Sin
   `SESSION_SECRET` el servicio no arranca: hay que definirla **antes** de
   desplegar esta versión.
 - Las IP de salida del servicio (en Render: *Connect → Outbound*) deben estar
