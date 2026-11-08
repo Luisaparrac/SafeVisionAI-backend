@@ -21,3 +21,19 @@ services:
         sync: false
       - key: TIMEZONE
         value: America/Bogota
+      - key: REGISTRATION_MODE
+        sync: false
+      - key: REGISTRATION_CODE
+        sync: false
+      - key: EMAIL_PROVIDER
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false
+      - key: MAIL_FROM_NAME
+        sync: false
+      - key: PASSWORD_RESET_URL
+        sync: false
+      - key: PASSWORD_RESET_TTL_MINUTES
+        sync: false
