@@ -46,9 +46,12 @@ def login(uow, hasher, throttle) -> AuthenticateUser:
     return AuthenticateUser(uow, hasher, throttle)
 
 
-def test_valid_credentials_return_the_user(login):
+def test_valid_credentials_return_the_user(login, uow):
     assert login.execute(" ANA@example.com ", "clave-1") == UserView(
-        id=2, name="Ana", email="Ana@Example.com"
+        id=2,
+        name="Ana",
+        email="Ana@Example.com",
+        password_fingerprint=uow.users.get(2).password_fingerprint,
     )
 
 

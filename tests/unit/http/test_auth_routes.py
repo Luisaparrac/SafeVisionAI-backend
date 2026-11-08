@@ -1,7 +1,13 @@
 import pytest
 
 from safevision.adapters.inbound.http.sessions import SESSION, SESSION_COOKIE
-from tests.fakes.users import TEST_EMAIL, TEST_NAME, TEST_PASSWORD
+from tests.fakes.users import (
+    FAST_HASHER,
+    TEST_EMAIL,
+    TEST_FINGERPRINT,
+    TEST_NAME,
+    TEST_PASSWORD,
+)
 
 SESSION_BODY = {
     "authenticated": True,
@@ -26,7 +32,8 @@ def test_login_returns_the_user_and_sets_the_cookie(client, container):
     assert response.status_code == 200
     assert response.json() == SESSION_BODY
     token = response.cookies[SESSION_COOKIE]
-    assert container.sessions.signer.read(token, SESSION) == 1
+    claims = container.sessions.signer.read(token, SESSION)
+    assert (claims.user_id, claims.fingerprint) == (1, TEST_FINGERPRINT)
 
 
 def test_session_cookie_attributes(client):
@@ -123,6 +130,17 @@ def test_session_ends_when_the_user_is_removed(client, uow):
     login(client)
     uow.users._rows.pop(1)
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_session_ends_when_the_password_changes(client, uow):
+    login(client)
+    assert client.get("/api/auth/me").status_code == 200
+    uow.users._rows[1].password_hash = FAST_HASHER.hash("otra-clave-1")
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_the_fingerprint_never_reaches_the_response(client):
+    assert "fingerprint" not in login(client).text
 
 
 def test_cookie_is_not_sent_over_plain_http(container):

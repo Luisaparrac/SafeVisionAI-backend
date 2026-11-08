@@ -39,7 +39,7 @@ def login(
     in 15 minutes that e-mail gets 429 until the oldest failure is 15 minutes old.
     """
     user = container.authenticate_user.execute(data.email, data.password)
-    container.sessions.start(response, user.id)
+    container.sessions.start(response, user)
     return SessionOut.from_view(user)
 
 
@@ -87,5 +87,7 @@ def ws_ticket(
     Useful when the browser does not send the cookie with the WebSocket. It only
     opens the feed: it is not accepted as a session anywhere else.
     """
-    ticket = container.sessions.signer.issue(user.id, WS_TICKET, WS_TICKET_LIFETIME)
+    ticket = container.sessions.signer.issue(
+        user.id, WS_TICKET, WS_TICKET_LIFETIME, user.password_fingerprint
+    )
     return WsTicketOut(ticket=ticket, expires_in=int(WS_TICKET_LIFETIME.total_seconds()))

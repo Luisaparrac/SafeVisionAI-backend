@@ -54,4 +54,9 @@ class AuthenticateUser:
 
 
 def to_view(user: User) -> UserView:
-    return UserView(id=require_id(user.id), name=user.name, email=user.email)
+    return UserView(
+        id=require_id(user.id),
+        name=user.name,
+        email=user.email,
+        password_fingerprint=user.password_fingerprint,
+    )

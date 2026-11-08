@@ -13,6 +13,7 @@ from safevision.application.dto import (
     AlertView,
     EventView,
 )
+from tests.fakes.users import FAST_HASHER, TEST_FINGERPRINT
 
 KEY = {"X-API-Key": "test-key"}
 
@@ -179,7 +180,9 @@ def test_ticket_is_not_a_session_and_a_session_is_not_a_ticket(client, container
     client.cookies.clear()
     client.cookies.set(SESSION_COOKIE, ticket)
     assert client.get("/api/auth/me").status_code == 401
-    session = container.sessions.signer.issue(1, SESSION, container.sessions.lifetime)
+    session = container.sessions.signer.issue(
+        1, SESSION, container.sessions.lifetime, TEST_FINGERPRINT
+    )
     assert closed_code(client, f"/ws/alertas?ticket={session}") == 4401
 
 
@@ -191,9 +194,23 @@ def test_feed_with_the_iot_key(anonymous):
     assert closed_code(anonymous, "/ws/alertas", headers=wrong) == 4401
 
 
+def test_ticket_of_an_older_password_is_refused(client, uow):
+    ticket = client.get("/api/auth/ws-ticket").json()["ticket"]
+    uow.users._rows[1].password_hash = FAST_HASHER.hash("otra-clave-1")
+    assert closed_code(client, f"/ws/alertas?ticket={ticket}") == 4401
+
+
 def session_cookie(container) -> str:
-    token = container.sessions.signer.issue(1, SESSION, container.sessions.lifetime)
+    token = container.sessions.signer.issue(
+        1, SESSION, container.sessions.lifetime, TEST_FINGERPRINT
+    )
     return f"{SESSION_COOKIE}={token}"
+
+
+def test_cookie_of_an_older_password_is_refused(anonymous, container, uow):
+    headers = {"cookie": session_cookie(container), "origin": "http://localhost:5173"}
+    uow.users._rows[1].password_hash = FAST_HASHER.hash("otra-clave-1")
+    assert closed_code(anonymous, "/ws/alertas", headers=headers) == 4401
 
 
 def test_feed_with_the_session_cookie_from_the_panel(anonymous, container):

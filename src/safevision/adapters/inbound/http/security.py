@@ -41,10 +41,12 @@ def _key_matches(provided: str | None, container: Container) -> bool:
 
 
 def session_user(request: Request, container: Container) -> UserView | None:
-    """The user of a valid session cookie who still exists in the database, or None."""
+    """The user of a valid session cookie who still exists with that password, or None."""
     token = request.cookies.get(SESSION_COOKIE)
-    user_id = None if not token else container.sessions.signer.read(token, SESSION)
-    return None if user_id is None else container.get_session_user.execute(user_id)
+    claims = None if not token else container.sessions.signer.read(token, SESSION)
+    if claims is None:
+        return None
+    return container.get_session_user.execute(claims.user_id, claims.fingerprint)
 
 
 def require_session(request: Request, container: Container = Depends(get_container)) -> UserView:
@@ -109,16 +111,18 @@ def websocket_allowed(websocket: WebSocket, container: Container) -> bool:
     * the session cookie, from a trusted origin: browsers send it with WebSocket
       handshakes from any site, and CORS does not apply to them.
 
-    With a ticket or a cookie the user must still exist. It reads the database,
-    so the endpoint runs it in a worker thread.
+    With a ticket or a cookie the user must still exist with the same password.
+    It reads the database, so the endpoint runs it in a worker thread.
     """
     ticket = websocket.query_params.get("ticket")
-    user_id = None if not ticket else container.sessions.signer.read(ticket, WS_TICKET)
-    if user_id is None:
+    claims = None if not ticket else container.sessions.signer.read(ticket, WS_TICKET)
+    if claims is None:
         provided = websocket.headers.get("x-api-key")
         if provided is not None and _key_matches(provided, container):
             return True
         token = websocket.cookies.get(SESSION_COOKIE)
         if token and _trusted_origin(websocket.headers, container):
-            user_id = container.sessions.signer.read(token, SESSION)
-    return user_id is not None and container.get_session_user.execute(user_id) is not None
+            claims = container.sessions.signer.read(token, SESSION)
+    if claims is None:
+        return False
+    return container.get_session_user.execute(claims.user_id, claims.fingerprint) is not None
