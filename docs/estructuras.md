@@ -1,6 +1,6 @@
 # Estructuras de datos
 
-SafeVision usa cuatro estructuras implementadas a mano, sin `heapq`,
+SafeVision usa estas estructuras implementadas a mano, sin `heapq`,
 `collections.deque`, `queue` ni `bisect`. Viven en el dominio
 (`src/safevision/domain/structures`) y en la aplicación
 (`application/services/event_deduplicator.py`), no dependen de ningún
@@ -12,13 +12,17 @@ framework y documentan en su docstring la complejidad de cada operación.
 | [Lista doblemente enlazada acotada](#2-historial-reciente-lista-doblemente-enlazada-acotada) | Mantener los N eventos más recientes y actualizar su estado sin recorrerlos | `AlertBoard` → `GET /api/eventos/recientes` |
 | [Cola FIFO enlazada](#3-cola-fifo-enlazada) | Descartar en orden de llegada lo que sale de una ventana de tiempo | Dentro del deduplicador |
 | [Deduplicador de ventana deslizante](#4-deduplicador-de-detecciones-cola--diccionario) | Reconocer detecciones repetidas del IoT en O(1) | `RegisterEvent` → `POST /api/eventos` |
+| [Árbol n-ario](#5-árbol-n-ario-de-instalaciones) | Resumir los pendientes y la severidad máxima por ubicación, cámara y zona | `GetInstallations` → `GET /api/instalaciones` |
+| [Límite de intentos](#6-límite-de-intentos-cola--diccionario) | Frenar inicios de sesión fallidos, registros y solicitudes de recuperación | `SlidingWindowLimiter` → `/api/auth/*` |
 
 **Relación con la base de datos.** PostgreSQL es la fuente de verdad. Las
 estructuras son índices en memoria: al arrancar, `RebuildAlertBoard` las
 reconstruye con los eventos abiertos y los más recientes, y cada caso de uso
 las actualiza **después** de confirmar la transacción. Si el proceso se
 reinicia no se pierde nada; si la base falla, la memoria no queda con datos
-que no existen.
+que no existen. El árbol n-ario es la excepción: no se conserva entre
+peticiones, se construye desde la base cada vez
+([ADR 0009](adr/0009-arbol-de-instalaciones.md)).
 
 **Concurrencia.** El servidor atiende peticiones en varios hilos. `AlertBoard`
 y `EventDeduplicator` protegen sus estructuras con un `threading.Lock`, de
@@ -277,7 +281,109 @@ reloj se inyecta, así las pruebas controlan el tiempo con un reloj falso.
 
 ---
 
-## 5. Límite de intentos: cola + diccionario
+## 5. Árbol n-ario de instalaciones
+
+Archivo: `domain/structures/nary_tree.py` (`NaryTree`), usado por
+`application/use_cases/get_installations.py` (`GetInstallations`).
+
+### Problema
+
+El operador necesita ver qué ubicación, qué cámara y qué zona concentran lo más
+grave sin revisar los eventos uno por uno. Los datos ya son jerárquicos: una
+ubicación tiene cámaras, una cámara tiene zonas y un evento pertenece a una
+cámara y, a veces, a una zona. El resumen de cada nivel depende de todo lo que
+cuelga de él.
+
+### Por qué un árbol
+
+Las estructuras lineales ordenan los elementos en una sola secuencia: el heap
+por urgencia, la lista por antigüedad y la cola por llegada. Ninguna representa
+la relación "pertenece a". Con listas planas, el total de una ubicación exigiría
+buscar sus cámaras, luego las zonas de cada una y luego sus eventos, y repetirlo
+en cada nivel. En un árbol cada elemento tiene un solo padre, así que un total
+se calcula una vez y se reutiliza hacia arriba.
+
+### Conceptos en SafeVision
+
+| Concepto | Qué es aquí |
+|---|---|
+| Raíz | Nodo interno que representa toda la instalación. La respuesta solo expone sus totales. |
+| Padre e hijo | La ubicación es padre de sus cámaras y la cámara, de sus zonas. |
+| Hermanos | Las cámaras de una misma ubicación o las zonas de una misma cámara. Se ordenan por nombre y luego por id. |
+| Hoja | Nodo sin hijos: toda zona, una cámara sin zonas o una ubicación sin cámaras. |
+| Rama | Un nodo con todo lo que cuelga de él, como una ubicación con sus cámaras y zonas. |
+| Nivel | La distancia a la raíz contada en nodos: raíz 1, ubicaciones 2, cámaras 3 y zonas 4. |
+| Altura | El mayor nivel que existe: 4 si hay alguna zona y 1 si no hay ubicaciones. |
+| Peso | El total de nodos: la raíz más las ubicaciones, las cámaras y las zonas. |
+| Orden | El máximo de hijos que admite un nodo. Aquí no tiene límite, y por eso el árbol es n-ario. |
+| Grado | El número de hijos de un nodo. El grado del árbol es el mayor de todos. |
+
+### Representación
+
+Cada nodo guarda `key`, `value`, `parent` y la lista ordenada `children`. El
+árbol guarda la raíz y un diccionario `clave → nodo`. Las claves incluyen el
+tipo, como `("camera", 3)`, porque una ubicación y una cámara pueden tener el
+mismo id.
+
+```
+                 raíz
+                /    \
+            Bodega   Casa
+                    /    \
+                Patio    Sala
+                           \
+                         Escalera
+```
+
+### Operaciones
+
+| Operación | Tiempo | Cómo funciona |
+|---|---|---|
+| `add_child(padre, clave, valor)` | O(1) | Busca al padre en el índice y agrega el nodo al final de sus hijos. Rechaza un padre inexistente o una clave repetida con `ValueError`. |
+| `find(clave)` | O(1) | Consulta el índice. Sirve para ubicar el padre de cada fila y el nodo de cada evento. |
+| `postorder()` | O(n) | Devuelve cada nodo después de todos sus hijos y la raíz al final. |
+
+Espacio: O(n). El postorden es recursivo: su pila crece con la altura, que aquí
+es como máximo 4.
+
+### Propagar el riesgo en postorden
+
+Cada evento pendiente suma en su zona. Si no tiene zona, si la zona ya no existe
+o si es de otra cámara, suma directamente en su cámara. Ese es `own_pending`.
+
+Luego una sola pasada en postorden completa los resúmenes. Cuando se visita un
+nodo, sus hijos ya están listos, de modo que:
+
+- `pending` = `own_pending` del nodo + la suma de `pending` de sus hijos;
+- `max_severity` = el mayor valor entre la severidad propia y la de sus hijos;
+- `priority` sale de `max_severity` con la regla de `Severity.priority`.
+
+La misma pasada arma la respuesta, porque la vista de cada nodo necesita las de
+sus hijos.
+
+```
+Escalera: propio 2, máx 4   →  pending 2, máx 4
+Sala:     propio 1, máx 2   →  pending 1 + 2 = 3, máx 4
+Patio:    propio 1, máx 1   →  pending 1, máx 1
+Casa:     propio 0          →  pending 3 + 1 = 4, máx 4
+raíz:     propio 0          →  pending 4, máx 4
+```
+
+"Pendiente" significa lo mismo que en la cola de alertas: los estados agrupados
+en `ReviewLabel.PENDING`. Por eso el total de la raíz coincide con
+`pendientes` de `/api/metricas`. Un evento abierto con una cámara o un tipo
+inexistente es un error y no se omite, porque ocultarlo desajustaría ese total.
+
+### Otros árboles del sistema
+
+- `AlertPriorityQueue` también es un árbol: uno binario completo guardado en un
+  arreglo, donde los hijos de la posición `i` están en `2i + 1` y `2i + 2`.
+- PostgreSQL resuelve sus claves primarias e índices con árboles B, que
+  mantienen las búsquedas en tiempo logarítmico sobre disco.
+
+---
+
+## 6. Límite de intentos: cola + diccionario
 
 Archivo: `application/services/rate_limiter.py` (`SlidingWindowLimiter`).
 
@@ -339,5 +445,7 @@ que basta para la única instancia del servicio.
 | | newest(limit) | O(limit) | |
 | Cola enlazada | enqueue / dequeue / peek | O(1) | O(n) |
 | Deduplicador | find_recent / remember | O(1) amortizado | O(ventana) |
+| Árbol n-ario | add_child / find | O(1) | O(n) |
+| | postorder | O(n) | |
 | Límite de inicios de sesión | is_blocked / record_failure | O(1) amortizado | O(fallos en la ventana) |
 | | clear | O(1) | |

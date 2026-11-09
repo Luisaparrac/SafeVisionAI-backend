@@ -2,13 +2,15 @@
 
 Implementadas a mano, sin `heapq`, `collections.deque`, `queue` ni `bisect`.
 No dependen de ningún framework. La base de datos es la fuente de verdad: estas
-estructuras son un índice en memoria que se reconstruye al arrancar.
+estructuras son un índice en memoria que se reconstruye al arrancar; el árbol
+n-ario se construye en cada petición.
 
 | Estructura | Archivo | Para qué se usa |
 |---|---|---|
 | Cola de prioridad (max-heap con índice de posiciones) | `alert_priority_queue.py` | Ordena las alertas pendientes: primero la de mayor severidad y, si empatan, la más antigua. |
 | Lista doblemente enlazada acotada | `event_history.py` | Historial de los eventos más recientes, del más nuevo al más antiguo. |
-| Cola FIFO enlazada | `linked_queue.py` | Ventanas deslizantes del deduplicador de detecciones (`application/services/event_deduplicator.py`) y del límite de intentos de inicio de sesión (`application/services/login_throttle.py`). |
+| Cola FIFO enlazada | `linked_queue.py` | Ventanas deslizantes del deduplicador de detecciones (`application/services/event_deduplicator.py`) y del límite de intentos de inicio de sesión (`application/services/rate_limiter.py`). |
+| Árbol n-ario con índice por clave | `nary_tree.py` | Resume los pendientes y la severidad máxima por ubicación, cámara y zona. |
 
 ## Cola de prioridad de alertas
 
@@ -65,3 +67,17 @@ Lista simplemente enlazada con referencias al frente y al final.
 **Uso en el deduplicador:** las detecciones entran en orden de llegada, así que
 las que salen de la ventana de tiempo siempre están al frente y se descartan en
 O(1) cada una (O(1) amortizado por detección).
+
+## Árbol n-ario
+
+Cada nodo apunta a su padre y a sus hijos, en orden. Un diccionario
+`clave → nodo` da acceso directo a cualquiera.
+
+| Operación | Tiempo |
+|---|---|
+| `add_child` | O(1) |
+| `find` | O(1) |
+| `postorder` | O(n) |
+
+**Por qué postorden:** cada nodo se visita después de sus hijos, así que sus
+totales ya están calculados cuando el padre los necesita.
