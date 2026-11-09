@@ -29,6 +29,7 @@ expires_in
 detail
 registration
 password_recovery
+zones
 
 # Parameters of protocol (port) methods and of __exit__, which only declare a signature.
 exc_type
@@ -42,11 +43,6 @@ MAINTENANCE
 CHILD
 ELDERLY
 PET
-
-# The n-ary tree has no production caller yet: the next change adds it.
-NaryTree
-add_child
-postorder
 
 # logging.Logger attribute set to silence the uvicorn access log.
 _.disabled

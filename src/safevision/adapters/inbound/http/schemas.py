@@ -8,7 +8,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from safevision.application.dto import AlertView, EventView, Metrics, UserView
+from safevision.application.dto import (
+    AlertView,
+    EventView,
+    InstallationNodeView,
+    InstallationsView,
+    Metrics,
+    UserView,
+)
 from safevision.application.use_cases.register_event import RegisterEventCommand
 from safevision.application.use_cases.register_user import Registration
 from safevision.domain.model.camera import Camera
@@ -221,6 +228,84 @@ class CameraCountOut(BaseModel):
     camera_id: int
     name: str
     total: int
+
+
+def _pending_summary(view: InstallationNodeView) -> dict[str, int | str | None]:
+    return {
+        "own_pending": view.own_pending,
+        "pending": view.pending,
+        "max_severity": view.max_severity,
+        "priority": view.priority,
+    }
+
+
+class InstallationZoneOut(BaseModel):
+    zone_id: int
+    name: str
+    own_pending: int
+    pending: int
+    max_severity: int | None
+    priority: str | None
+
+    @classmethod
+    def from_view(cls, view: InstallationNodeView) -> "InstallationZoneOut":
+        return cls(zone_id=view.id, name=view.name, **_pending_summary(view))
+
+
+class InstallationCameraOut(BaseModel):
+    camera_id: int
+    name: str
+    status: str
+    own_pending: int = Field(description="Pendientes de la cámara que no están en ninguna zona")
+    pending: int = Field(description="Pendientes de la cámara y de sus zonas")
+    max_severity: int | None
+    priority: str | None
+    zones: list[InstallationZoneOut]
+
+    @classmethod
+    def from_view(cls, view: InstallationNodeView) -> "InstallationCameraOut":
+        return cls(
+            camera_id=view.id,
+            name=view.name,
+            status=view.status,
+            zones=[InstallationZoneOut.from_view(zone) for zone in view.children],
+            **_pending_summary(view),
+        )
+
+
+class InstallationLocationOut(BaseModel):
+    location_id: int
+    name: str
+    own_pending: int
+    pending: int = Field(description="Pendientes de todas las cámaras y zonas de la ubicación")
+    max_severity: int | None = Field(description="De 1 a 4; null si no hay pendientes")
+    priority: str | None = Field(description="Alto, Medio o Bajo; null si no hay pendientes")
+    cameras: list[InstallationCameraOut]
+
+    @classmethod
+    def from_view(cls, view: InstallationNodeView) -> "InstallationLocationOut":
+        return cls(
+            location_id=view.id,
+            name=view.name,
+            cameras=[InstallationCameraOut.from_view(camera) for camera in view.children],
+            **_pending_summary(view),
+        )
+
+
+class InstallationsOut(BaseModel):
+    pending: int
+    max_severity: int | None
+    priority: str | None
+    locations: list[InstallationLocationOut]
+
+    @classmethod
+    def from_view(cls, view: InstallationsView) -> "InstallationsOut":
+        return cls(
+            pending=view.pending,
+            max_severity=view.max_severity,
+            priority=view.priority,
+            locations=[InstallationLocationOut.from_view(item) for item in view.locations],
+        )
 
 
 # RFC 5321 limit for an address; passwords are capped so one request cannot hash megabytes.

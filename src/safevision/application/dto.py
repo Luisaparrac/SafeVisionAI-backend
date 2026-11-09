@@ -79,3 +79,25 @@ class CameraCount:
     camera_id: int
     name: str
     total: int
+
+
+@dataclass(frozen=True)
+class InstallationNodeView:
+    """A location, camera or zone with the pending events of its whole branch."""
+
+    id: int
+    name: str
+    status: str | None  # only cameras have one
+    own_pending: int
+    pending: int
+    max_severity: int | None  # 1 to 4; None without pending events
+    priority: str | None  # Alto / Medio / Bajo; None without pending events
+    children: tuple["InstallationNodeView", ...]
+
+
+@dataclass(frozen=True)
+class InstallationsView:
+    pending: int
+    max_severity: int | None
+    priority: str | None
+    locations: tuple[InstallationNodeView, ...]

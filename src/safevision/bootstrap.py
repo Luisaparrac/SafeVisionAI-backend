@@ -24,6 +24,7 @@ from safevision.application.services.event_deduplicator import EventDeduplicator
 from safevision.application.services.rate_limiter import SlidingWindowLimiter
 from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.application.use_cases.get_event import GetEvent
+from safevision.application.use_cases.get_installations import GetInstallations
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
@@ -108,6 +109,7 @@ def build_container(
         get_metrics=GetMetrics(uow, board),
         event_type_statistics=GetEventTypeStatistics(uow, settings.tzinfo),
         camera_statistics=GetCameraStatistics(uow, settings.tzinfo),
+        get_installations=GetInstallations(uow),
         list_event_types=ListEventTypes(uow),
         list_locations=ListLocations(uow),
         list_cameras=ListCameras(uow),
