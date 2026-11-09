@@ -12,11 +12,18 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from safevision.application.errors import (
+    AccountError,
+    EmailAlreadyRegisteredError,
     InvalidCredentialsError,
+    InvalidInvitationCodeError,
+    InvalidResetTokenError,
+    PasswordRecoveryUnavailableError,
     PersistenceError,
+    RegistrationClosedError,
     StorageConflictError,
     StorageUnavailableError,
     TooManyLoginAttemptsError,
+    TooManyRequestsError,
 )
 from safevision.domain.errors import (
     DomainError,
@@ -71,6 +78,23 @@ async def too_many_attempts_handler(_: Request, error: Exception) -> JSONRespons
     return JSONResponse(status_code=429, content={"detail": error.message})
 
 
+STATUS_BY_ACCOUNT_ERROR: dict[type[AccountError], int] = {
+    RegistrationClosedError: 403,
+    InvalidInvitationCodeError: 403,
+    EmailAlreadyRegisteredError: 409,
+    TooManyRequestsError: 429,
+    PasswordRecoveryUnavailableError: 503,
+    InvalidResetTokenError: 400,
+}
+
+
+async def account_error_handler(_: Request, error: Exception) -> JSONResponse:
+    assert isinstance(error, AccountError)
+    return JSONResponse(
+        status_code=STATUS_BY_ACCOUNT_ERROR[type(error)], content={"detail": error.message}
+    )
+
+
 async def unexpected_error_handler(_: Request, error: Exception) -> JSONResponse:
     logger.error("unexpected error: %s", type(error).__name__)
     return JSONResponse(status_code=500, content={"detail": INTERNAL_ERROR_MESSAGE})
@@ -81,4 +105,5 @@ def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(PersistenceError, persistence_error_handler)
     app.add_exception_handler(InvalidCredentialsError, invalid_credentials_handler)
     app.add_exception_handler(TooManyLoginAttemptsError, too_many_attempts_handler)
+    app.add_exception_handler(AccountError, account_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)

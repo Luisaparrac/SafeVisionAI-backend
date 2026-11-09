@@ -15,15 +15,16 @@ lista que genera FastAPI.
 
 | Código | Cuándo |
 |---|---|
+| 400 | Enlace de recuperación inválido, vencido o ya usado (`"El enlace no es válido o expiró"`) |
 | 401 | Sin sesión válida ni `X-API-Key` (`"Inicia sesión para continuar"`), clave incorrecta en una ruta del IoT (`"X-API-Key inválida"`) o credenciales incorrectas en el login (`"Correo o contraseña incorrectos"`) |
-| 403 | Cambio con la cookie de sesión desde un origen no permitido (`"Origen no permitido"`) |
+| 403 | Cambio con la cookie de sesión desde un origen no permitido (`"Origen no permitido"`); registro cerrado o código de invitación inválido |
 | 404 | No existe el recurso o una referencia (cámara, tipo, sujeto, zona) |
-| 409 | Transición no permitida (por ejemplo, falsa alarma sobre un evento ya resuelto) o conflicto con datos que cambiaron |
+| 409 | Transición no permitida (por ejemplo, falsa alarma sobre un evento ya resuelto), conflicto con datos que cambiaron o correo ya registrado |
 | 413 | El cuerpo supera 64 KiB |
 | 422 | Cuerpo o parámetros inválidos |
-| 429 | Demasiados inicios de sesión fallidos con un correo |
+| 429 | Demasiados inicios de sesión fallidos con un correo, o demasiados registros o solicitudes de recuperación |
 | 500 | Error inesperado: `{"detail": "Error interno del servidor"}`, sin detalles internos |
-| 503 | La base de datos no está disponible |
+| 503 | La base de datos no está disponible, o la recuperación de contraseña no está configurada |
 
 **Encabezados de respuesta.** Todas las respuestas llevan `X-Request-ID` (el
 que envió el cliente si es seguro, o uno nuevo), `X-Content-Type-Options:
@@ -32,8 +33,10 @@ permite los orígenes de `FRONTEND_ORIGINS` con credenciales
 (`Access-Control-Allow-Credentials: true` y el origen exacto, nunca `*`) y
 expone `X-Duplicate` y `X-Request-ID`.
 
-**Autenticación.** Todas las rutas de `/api`, salvo `POST /api/auth/login` y
-`POST /api/auth/logout`, exigen la cookie de sesión del panel **o** la
+**Autenticación.** Todas las rutas de `/api`, salvo `POST /api/auth/login`,
+`POST /api/auth/logout`, `POST /api/auth/register`,
+`POST /api/auth/password/forgot`, `POST /api/auth/password/reset` y
+`GET /api/auth/options`, exigen la cookie de sesión del panel **o** la
 `X-API-Key` del módulo IoT; `POST /api/eventos` y
 `PATCH /api/camaras/{id}/estado` exigen siempre la clave. Son públicas
 `GET /`, `/health`, `/health/ready`, `/docs` y `/openapi.json`. Detalle en
@@ -73,7 +76,8 @@ Forma de cada evento en todas las respuestas:
 
 ## Autenticación
 
-Decisión y alternativas en [ADR 0007](adr/0007-sesion-con-cookie-firmada.md).
+Decisiones y alternativas en [ADR 0007](adr/0007-sesion-con-cookie-firmada.md)
+y [ADR 0008](adr/0008-registro-y-recuperacion-sin-tabla.md).
 
 ### Sesión del panel
 
@@ -83,12 +87,12 @@ petición (`credentials: "include"` en `fetch`). El panel nunca ve el token.
 | Atributo | Valor |
 |---|---|
 | Nombre | `sv_session` |
-| Contenido | Id del usuario, emisión y expiración, firmados con HMAC-SHA256 y `SESSION_SECRET` |
+| Contenido | Id del usuario, emisión, expiración y huella de la contraseña, firmados con HMAC-SHA256 y `SESSION_SECRET` |
 | Duración | `SESSION_TTL_HOURS` (8 h por defecto), sin renovación |
 | Atributos | `HttpOnly`, `Secure`, `Path=/`, sin `Domain`, `SameSite` de `SESSION_COOKIE_SAMESITE` (`none` por defecto o `lax`) |
 
 En cada petición el usuario se vuelve a leer de la tabla `users`: si ya no
-existe, la sesión deja de valer (401). Como la cookie es `Secure`, el navegador
+existe o **su contraseña cambió**, la sesión deja de valer (401). Como la cookie es `Secure`, el navegador
 solo la envía por https (o a `localhost`).
 
 **Protección CSRF.** Un `POST`, `PUT`, `PATCH` o `DELETE` con la cookie debe
@@ -148,6 +152,116 @@ Requiere la cookie (la `X-API-Key` no basta). Responde
 `{"ticket": "<token>", "expires_in": 60}`: un token firmado que solo sirve para
 abrir `/ws/alertas?ticket=<token>` durante 60 segundos. Sirve cuando el
 navegador no envía la cookie con el WebSocket.
+
+### Política de datos de una cuenta
+
+La aplican el registro y el restablecimiento. Un incumplimiento responde
+`422 {"detail": "<mensaje>"}` con uno de estos textos:
+
+| Campo | Regla | Mensaje |
+|---|---|---|
+| `password` | Mínimo 8 caracteres | `La contraseña debe tener al menos 8 caracteres` |
+| `password` | Máximo 128 caracteres | `La contraseña no puede superar 128 caracteres` |
+| `password` | Al menos una letra y un número | `La contraseña debe incluir al menos una letra y un número` |
+| `name` | Sin espacios al inicio o al final | `El nombre no puede empezar ni terminar con espacios` |
+| `name` | De 2 a 100 caracteres | `El nombre debe tener entre 2 y 100 caracteres` |
+| `name` | Sin caracteres de control | `El nombre contiene caracteres no permitidos` |
+| `email` | El patrón de `chk_users_email`, hasta 320 caracteres | `El correo no tiene un formato válido` |
+
+Si falta un campo o su tipo es incorrecto, `detail` es la lista que genera
+FastAPI.
+
+### `GET /api/auth/options`
+
+Pública. Indica qué botones puede mostrar el panel:
+
+```json
+{"registration": "invite", "password_recovery": true}
+```
+
+`registration` es `closed`, `invite` u `open`. El modo `invite` sin
+`REGISTRATION_CODE` configurado se informa como `closed`, porque así se comporta.
+`password_recovery` es `false` con `EMAIL_PROVIDER=disabled`.
+
+### `POST /api/auth/register`
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{"name": "Usuario de ejemplo", "email": "Usuario@Example.com", "password": "contraseña1", "invitation_code": "<código>"}
+```
+
+```http
+HTTP/1.1 201 Created
+Set-Cookie: sv_session=<token>; HttpOnly; Max-Age=28800; Path=/; SameSite=none; Secure
+Content-Type: application/json
+
+{"authenticated": true, "user": {"id": 7, "name": "Usuario de ejemplo", "email": "usuario@example.com"}}
+```
+
+`invitation_code` solo se usa en modo `invite`. El correo se guarda en
+minúsculas y la cuenta queda con la sesión iniciada.
+
+| Código | `detail` | Cuándo |
+|---|---|---|
+| `201` | — | Cuenta creada |
+| `403` | `El registro de cuentas no está habilitado` | Modo `closed`, o `invite` sin código configurado |
+| `403` | `Código de invitación inválido` | Modo `invite` con el código ausente o incorrecto |
+| `403` | `Origen no permitido` | Trae un `Origin` que no está en `FRONTEND_ORIGINS` |
+| `409` | `Ya existe una cuenta con ese correo` | El correo ya existe, sin distinguir mayúsculas |
+| `422` | Ver la política | Nombre, correo o contraseña inválidos |
+| `429` | `Demasiadas solicitudes. Intenta de nuevo más tarde.` | 5 intentos con datos válidos desde la misma dirección en una hora, incluidos los rechazados |
+
+Como el login, no exige `Origin`, porque todavía no hay una sesión que proteger.
+
+### `POST /api/auth/password/forgot`
+
+```http
+POST /api/auth/password/forgot
+Content-Type: application/json
+
+{"email": "usuario@example.com"}
+```
+
+```http
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+
+{"detail": "Si el correo está registrado, recibirás un enlace para restablecer la contraseña."}
+```
+
+La respuesta es la misma exista o no el correo, y tarda lo mismo: la búsqueda y
+el envío ocurren después de responder. Si el correo pertenece a exactamente un
+usuario, recibe `PASSWORD_RESET_URL?token=<token>`, válido durante
+`PASSWORD_RESET_TTL_MINUTES` (30 por defecto) y una sola vez.
+
+| Código | `detail` | Cuándo |
+|---|---|---|
+| `202` | El mensaje de arriba | Siempre que la solicitud se acepta |
+| `422` | Lista de FastAPI | Falta `email`, no es texto o supera 320 caracteres |
+| `429` | `Demasiadas solicitudes. Intenta de nuevo más tarde.` | 3 solicitudes por correo o 10 por dirección en una hora |
+| `503` | `La recuperación de contraseña no está disponible` | `EMAIL_PROVIDER=disabled` |
+
+### `POST /api/auth/password/reset`
+
+```http
+POST /api/auth/password/reset
+Content-Type: application/json
+
+{"token": "<token del enlace>", "new_password": "contraseña2"}
+```
+
+`204` sin cuerpo si la contraseña cambió. **No inicia sesión**: el panel debe
+llevar al usuario al login. Todas las sesiones anteriores de esa cuenta quedan
+invalidadas (401).
+
+| Código | `detail` | Cuándo |
+|---|---|---|
+| `204` | — | Contraseña cambiada |
+| `400` | `El enlace no es válido o expiró` | Token alterado, vencido, ya usado o de una contraseña anterior |
+| `422` | Ver la política | La contraseña no cumple la política; el enlace sigue sirviendo |
+| `429` | `Demasiadas solicitudes. Intenta de nuevo más tarde.` | 10 intentos desde la misma dirección en una hora |
 
 ### Lo que el frontend detecta
 

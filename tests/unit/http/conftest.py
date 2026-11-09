@@ -12,10 +12,12 @@ from safevision.bootstrap import build_container
 from safevision.config.settings import Settings
 from tests.fakes.catalog import seed_reference_catalog
 from tests.fakes.clock import FakeClock
+from tests.fakes.email import CapturingEmailSender
 from tests.fakes.unit_of_work import FakeUnitOfWork
 from tests.fakes.users import FAST_HASHER, TEST_EMAIL, TEST_PASSWORD
 
 PANEL_ORIGIN = "http://localhost:5173"
+RESET_URL = "https://panel.example.com/restablecer"
 
 
 @pytest.fixture
@@ -25,6 +27,7 @@ def settings() -> Settings:
         iot_api_key="test-key",
         session_secret="test-session-secret-0123456789abcdef",
         frontend_origins=("http://localhost:5173",),
+        password_reset_url=RESET_URL,
     )
 
 
@@ -41,8 +44,13 @@ def clock() -> FakeClock:
 
 
 @pytest.fixture
-def container(settings, uow, clock):
-    return build_container(settings, uow, clock, password_hasher=FAST_HASHER)
+def outbox() -> CapturingEmailSender:
+    return CapturingEmailSender()
+
+
+@pytest.fixture
+def container(settings, uow, clock, outbox):
+    return build_container(settings, uow, clock, password_hasher=FAST_HASHER, email_sender=outbox)
 
 
 @pytest.fixture

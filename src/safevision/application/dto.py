@@ -3,7 +3,7 @@
 The HTTP adapter maps these fields to the JSON keys of the public contract.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -31,11 +31,15 @@ class AlertView:
 
 @dataclass(frozen=True)
 class UserView:
-    """The signed-in user as the panel sees it; never includes the password hash."""
+    """The signed-in user as the panel sees it; never includes the password hash.
+
+    ``password_fingerprint`` only goes into signed tokens, never into a response.
+    """
 
     id: int
     name: str
     email: str
+    password_fingerprint: str = field(repr=False)
 
 
 @dataclass(frozen=True)

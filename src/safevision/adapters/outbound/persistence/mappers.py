@@ -39,6 +39,10 @@ def user_to_domain(row: UserRow) -> User:
     return User(id=row.user_id, name=row.name, email=row.email, password_hash=row.password_hash)
 
 
+def user_to_row(user: User) -> UserRow:
+    return UserRow(name=user.name, email=user.email, password_hash=user.password_hash)
+
+
 def location_to_domain(row: LocationRow) -> Location:
     return Location(
         id=row.location_id,

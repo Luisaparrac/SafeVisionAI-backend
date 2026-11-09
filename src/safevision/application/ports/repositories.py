@@ -138,9 +138,29 @@ class CatalogRepository(Protocol):
 
 @runtime_checkable
 class UserRepository(Protocol):
-    """Read-only access to the people who sign in to the panel."""
+    """The people who sign in to the panel."""
 
     def get(self, user_id: int) -> User | None: ...
+
+    def add(self, user: User) -> User:
+        """Stores a new user and returns it with its assigned id."""
+        ...
+
+    def replace_password_hash(self, user_id: int, current: str, new: str) -> bool:
+        """Sets ``new`` only if the stored hash is still ``current``; whether it did.
+
+        The check and the change are one statement, so of two simultaneous
+        requests with the same reset link only one can succeed.
+        """
+        ...
+
+    def lock_email(self, email: str) -> None:
+        """Serializes, until the end of the transaction, whoever creates that e-mail.
+
+        The column has no UNIQUE constraint, so two simultaneous registrations
+        would otherwise both find the e-mail free and both insert it.
+        """
+        ...
 
     def find_by_email(self, email: str) -> list[User]:
         """Users whose e-mail equals ``email`` ignoring case and surrounding spaces, by id.

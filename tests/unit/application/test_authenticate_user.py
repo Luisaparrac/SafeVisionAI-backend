@@ -1,9 +1,11 @@
+from datetime import timedelta
+
 import pytest
 
 from safevision.adapters.outbound.pbkdf2_password_hasher import Pbkdf2PasswordHasher
 from safevision.application.dto import UserView
 from safevision.application.errors import InvalidCredentialsError, TooManyLoginAttemptsError
-from safevision.application.services.login_throttle import LoginThrottle
+from safevision.application.services.rate_limiter import SlidingWindowLimiter
 from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.domain.model.user import User
 
@@ -32,8 +34,8 @@ def hasher() -> CountingHasher:
 
 
 @pytest.fixture
-def throttle(clock) -> LoginThrottle:
-    return LoginThrottle(clock.now)
+def throttle(clock) -> SlidingWindowLimiter:
+    return SlidingWindowLimiter(clock.now, 5, timedelta(minutes=15))
 
 
 @pytest.fixture
@@ -44,9 +46,12 @@ def login(uow, hasher, throttle) -> AuthenticateUser:
     return AuthenticateUser(uow, hasher, throttle)
 
 
-def test_valid_credentials_return_the_user(login):
+def test_valid_credentials_return_the_user(login, uow):
     assert login.execute(" ANA@example.com ", "clave-1") == UserView(
-        id=2, name="Ana", email="Ana@Example.com"
+        id=2,
+        name="Ana",
+        email="Ana@Example.com",
+        password_fingerprint=uow.users.get(2).password_fingerprint,
     )
 
 

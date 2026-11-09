@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from safevision.application.dto import AlertView, EventView, Metrics, UserView
 from safevision.application.use_cases.register_event import RegisterEventCommand
+from safevision.application.use_cases.register_user import Registration
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event_type import EventType
 from safevision.domain.model.location import Location
@@ -234,6 +235,59 @@ class LoginIn(BaseModel):
 
     email: str = Field(max_length=MAX_EMAIL_LENGTH)
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class RegisterIn(BaseModel):
+    """Lengths and formats are rules of the domain, so they answer with its messages."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "Usuario de ejemplo",
+                    "email": "usuario@example.com",
+                    "password": "contraseña1",
+                    "invitation_code": "código",
+                }
+            ]
+        }
+    )
+
+    name: str
+    email: str
+    password: str
+    invitation_code: str | None = None
+
+    def to_registration(self) -> Registration:
+        return Registration(**self.model_dump())
+
+
+class ForgotPasswordIn(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"examples": [{"email": "usuario@example.com"}]})
+
+    email: str = Field(max_length=MAX_EMAIL_LENGTH)
+
+
+class ResetPasswordIn(BaseModel):
+    """The password has no limit here so that the policy answers with its own message."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"token": "<token>", "new_password": "contraseña1"}]}
+    )
+
+    token: str
+    new_password: str
+
+
+class AuthOptionsOut(BaseModel):
+    """What the panel may offer; lets it show or hide its buttons."""
+
+    registration: Literal["closed", "invite", "open"]
+    password_recovery: bool
+
+
+class MessageOut(BaseModel):
+    detail: str
 
 
 class UserOut(BaseModel):

@@ -277,9 +277,9 @@ reloj se inyecta, así las pruebas controlan el tiempo con un reloj falso.
 
 ---
 
-## 5. Límite de intentos de inicio de sesión: cola + diccionario
+## 5. Límite de intentos: cola + diccionario
 
-Archivo: `application/services/login_throttle.py` (`LoginThrottle`).
+Archivo: `application/services/rate_limiter.py` (`SlidingWindowLimiter`).
 
 ### Problema
 
@@ -287,6 +287,11 @@ Sin límite, cualquiera podría probar contraseñas una tras otra contra un
 correo. Un correo con **5 intentos fallidos en los últimos 15 minutos** queda
 bloqueado (`POST /api/auth/login` responde 429) hasta que el más antiguo de
 esos fallos cumple 15 minutos. Un inicio de sesión correcto borra su cuenta.
+
+El registro y la recuperación de contraseña reutilizan la clase con claves y
+ventanas propias (por dirección y por correo, en una hora). Allí `try_acquire`
+comprueba y cuenta bajo el mismo candado, para que dos peticiones simultáneas
+no superen el límite.
 
 ### Representación
 

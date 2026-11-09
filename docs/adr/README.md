@@ -13,3 +13,4 @@ se borra: se marca como sustituida y se enlaza la nueva.
 | [0005](0005-humo-dependencias-produccion.md) | Prueba de humo con el comando real y solo dependencias de producción | Aceptada |
 | [0006](0006-websocket-sin-autenticacion.md) | WebSocket de alertas sin autenticación | Sustituida por 0007 |
 | [0007](0007-sesion-con-cookie-firmada.md) | Sesión del panel con cookie firmada | Aceptada |
+| [0008](0008-registro-y-recuperacion-sin-tabla.md) | Registro por invitación y recuperación de contraseña sin tabla nueva | Aceptada |

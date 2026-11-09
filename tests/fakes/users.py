@@ -5,6 +5,7 @@ the hasher accepts because the iterations travel inside each stored hash.
 """
 
 from safevision.adapters.outbound.pbkdf2_password_hasher import Pbkdf2PasswordHasher
+from safevision.domain.model.user import User
 
 FAST_HASHER = Pbkdf2PasswordHasher(iterations=1_000)
 
@@ -12,3 +13,6 @@ TEST_NAME = "Usuario de prueba"
 TEST_EMAIL = "usuario@example.com"
 TEST_PASSWORD = "clave-de-prueba"
 TEST_PASSWORD_HASH = FAST_HASHER.hash(TEST_PASSWORD)
+TEST_FINGERPRINT = User(
+    name=TEST_NAME, email=TEST_EMAIL, password_hash=TEST_PASSWORD_HASH
+).password_fingerprint

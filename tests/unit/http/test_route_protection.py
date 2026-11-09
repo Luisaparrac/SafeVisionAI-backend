@@ -15,7 +15,14 @@ from tests.fakes.clock import FakeClock
 from tests.fakes.unit_of_work import FakeUnitOfWork
 
 KEY = {"X-API-Key": "test-key"}
-OPEN = {("POST", "/api/auth/login"), ("POST", "/api/auth/logout")}
+OPEN = {
+    ("POST", "/api/auth/login"),
+    ("POST", "/api/auth/logout"),
+    ("POST", "/api/auth/register"),
+    ("POST", "/api/auth/password/forgot"),
+    ("POST", "/api/auth/password/reset"),
+    ("GET", "/api/auth/options"),
+}
 # Only the IoT module calls these; a panel session is not enough.
 IOT_ONLY = {("POST", "/api/eventos"), ("PATCH", "/api/camaras/{camera_id}/estado")}
 

@@ -9,6 +9,18 @@ rutas del panel; las formas JSON se mantienen.
 ## [Sin publicar]
 
 ### Agregado
+- Registro de cuentas con `POST /api/auth/register`, en modo `closed`, `invite`
+  (por defecto) u `open`, con inicio de sesión automático.
+- Recuperación de contraseña con `POST /api/auth/password/forgot` y
+  `POST /api/auth/password/reset`, mediante enlaces firmados de un solo uso y
+  envío por la API HTTPS de Brevo.
+- `GET /api/auth/options`: qué acciones de cuenta ofrece el despliegue.
+- Política compartida de contraseña, nombre y correo.
+- Límites en memoria para registro, solicitud y restablecimiento (429).
+- Variables opcionales `REGISTRATION_MODE`, `REGISTRATION_CODE`,
+  `EMAIL_PROVIDER`, `BREVO_API_KEY`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME`,
+  `PASSWORD_RESET_URL` y `PASSWORD_RESET_TTL_MINUTES`.
+- ADR 0008.
 - Inicio de sesión del panel con los usuarios de la tabla `users`:
   `POST /api/auth/login`, `GET /api/auth/me` y `POST /api/auth/logout`, con la
   cookie `sv_session` (`HttpOnly`, `Secure`, firmada con HMAC-SHA256).
@@ -36,6 +48,9 @@ rutas del panel; las formas JSON se mantienen.
   referencia de la API, ADR, guía de contribución y política de seguridad.
 
 ### Cambiado
+- La sesión y el ticket del WebSocket llevan una huella de la contraseña: si
+  esta cambia, dejan de valer (401). Las cookies emitidas antes de esta versión
+  tampoco valen, así que cada usuario debe iniciar sesión una vez más.
 - Todas las rutas de `/api`, salvo iniciar y cerrar sesión, exigen la cookie
   de sesión o la `X-API-Key` (401). La clave sigue leyendo los catálogos.
 - Los cambios hechos con la cookie exigen un `Origin` de `FRONTEND_ORIGINS` o

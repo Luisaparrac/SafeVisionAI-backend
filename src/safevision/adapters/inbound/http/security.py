@@ -1,6 +1,7 @@
 """Protection of the endpoints: X-API-Key for the IoT module, session cookie for the panel."""
 
 import hmac
+import ipaddress
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
@@ -36,15 +37,34 @@ def require_iot_key(
         raise HTTPException(401, "X-API-Key inválida")
 
 
+def client_address(request: Request) -> str:
+    """The address the rate limits count by. It only lives in memory: it is never logged.
+
+    The server sits behind proxies, so the connection itself shows the proxy for
+    every visitor. CF-Connecting-IP is overwritten by the edge in front of the
+    hosting platform; the last entry of X-Forwarded-For is added by the nearest
+    proxy. The first entries of that list are sent by the client and can be faked.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "").rsplit(",", 1)[-1]
+    for candidate in (request.headers.get("cf-connecting-ip", ""), forwarded):
+        try:
+            return str(ipaddress.ip_address(candidate.strip()))
+        except ValueError:
+            continue
+    return request.client.host if request.client else "unknown"
+
+
 def _key_matches(provided: str | None, container: Container) -> bool:
     return hmac.compare_digest((provided or "").encode(), container.iot_api_key.encode())
 
 
 def session_user(request: Request, container: Container) -> UserView | None:
-    """The user of a valid session cookie who still exists in the database, or None."""
+    """The user of a valid session cookie who still exists with that password, or None."""
     token = request.cookies.get(SESSION_COOKIE)
-    user_id = None if not token else container.sessions.signer.read(token, SESSION)
-    return None if user_id is None else container.get_session_user.execute(user_id)
+    claims = None if not token else container.sessions.signer.read(token, SESSION)
+    if claims is None:
+        return None
+    return container.get_session_user.execute(claims.user_id, claims.fingerprint)
 
 
 def require_session(request: Request, container: Container = Depends(get_container)) -> UserView:
@@ -85,6 +105,15 @@ def ensure_trusted_origin(request: Request, container: Container) -> None:
         raise HTTPException(403, UNTRUSTED_ORIGIN)
 
 
+def reject_foreign_origin(request: Request, container: Container) -> None:
+    """Routes that open a session: there is none to protect yet, so no Origin is required.
+
+    Clients that are not browsers send no Origin; when one comes, it must be trusted.
+    """
+    if "origin" in request.headers and not _trusted_origin(request.headers, container):
+        raise HTTPException(403, UNTRUSTED_ORIGIN)
+
+
 def _trusted_origin(headers: Mapping[str, str], container: Container) -> bool:
     origin = headers.get("origin") or _origin_of(headers.get("referer"))
     if origin is None:
@@ -109,16 +138,18 @@ def websocket_allowed(websocket: WebSocket, container: Container) -> bool:
     * the session cookie, from a trusted origin: browsers send it with WebSocket
       handshakes from any site, and CORS does not apply to them.
 
-    With a ticket or a cookie the user must still exist. It reads the database,
-    so the endpoint runs it in a worker thread.
+    With a ticket or a cookie the user must still exist with the same password.
+    It reads the database, so the endpoint runs it in a worker thread.
     """
     ticket = websocket.query_params.get("ticket")
-    user_id = None if not ticket else container.sessions.signer.read(ticket, WS_TICKET)
-    if user_id is None:
+    claims = None if not ticket else container.sessions.signer.read(ticket, WS_TICKET)
+    if claims is None:
         provided = websocket.headers.get("x-api-key")
         if provided is not None and _key_matches(provided, container):
             return True
         token = websocket.cookies.get(SESSION_COOKIE)
         if token and _trusted_origin(websocket.headers, container):
-            user_id = container.sessions.signer.read(token, SESSION)
-    return user_id is not None and container.get_session_user.execute(user_id) is not None
+            claims = container.sessions.signer.read(token, SESSION)
+    if claims is None:
+        return False
+    return container.get_session_user.execute(claims.user_id, claims.fingerprint) is not None
