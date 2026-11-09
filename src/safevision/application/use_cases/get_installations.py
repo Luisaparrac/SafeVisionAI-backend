@@ -20,7 +20,7 @@ from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.domain.errors import NotFoundError
 from safevision.domain.model.event import Event
 from safevision.domain.model.identity import require_id
-from safevision.domain.model.values import ReviewLabel
+from safevision.domain.model.values import ReviewLabel, Severity
 from safevision.domain.structures.nary_tree import NaryTree
 
 _Key = tuple[str, int]
@@ -96,17 +96,27 @@ class GetInstallations:
         with self._uow as uow:
             tree = _hierarchy(uow)
             _count_pending_events(uow, tree)
+        # In postorder the children are ready when their parent needs their totals.
         views: dict[_Key, InstallationNodeView] = {}
         for node in tree.postorder():
+            children = tuple(views[child.key] for child in node.children)
+            highest = max(
+                (
+                    level
+                    for level in (node.value.own_severity, *(c.max_severity for c in children))
+                    if level is not None
+                ),
+                default=None,
+            )
             views[node.key] = InstallationNodeView(
                 id=node.key[1],
                 name=node.value.name,
                 status=node.value.status,
                 own_pending=node.value.own_pending,
-                pending=0,
-                max_severity=None,
-                priority=None,
-                children=tuple(views[child.key] for child in node.children),
+                pending=node.value.own_pending + sum(child.pending for child in children),
+                max_severity=highest,
+                priority=None if highest is None else Severity(highest).priority.value,
+                children=children,
             )
         root = views[_ROOT]
         return InstallationsView(root.pending, root.max_severity, root.priority, root.children)

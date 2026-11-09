@@ -1,6 +1,9 @@
 import pytest
 
+from safevision.application.services.alert_board import AlertBoard
 from safevision.application.use_cases.get_installations import GetInstallations
+from safevision.application.use_cases.get_metrics import GetMetrics
+from safevision.application.use_cases.rebuild_alert_board import RebuildAlertBoard
 from safevision.domain.errors import NotFoundError
 from safevision.domain.model.camera import Camera
 from safevision.domain.model.event import Event
@@ -147,3 +150,72 @@ def test_an_open_event_of_a_missing_camera_is_reported(uow, clock):
     add_event(uow, clock, 1, camera_id=99)
     with pytest.raises(NotFoundError, match="Cámara 99"):
         GetInstallations(uow).execute()
+
+
+def summary(node) -> tuple:
+    return (node.own_pending, node.pending, node.max_severity, node.priority)
+
+
+def test_totals_and_highest_severity_go_up_the_tree(uow, clock):
+    # event types: 1 Caída (4), 2 Merodeo (2), 3 Ruido (1), 4 Humo (3)
+    add_event(uow, clock, 1, zone_id=1)
+    add_event(uow, clock, 3, zone_id=1)
+    add_event(uow, clock, 2)  # camera 1, no zone
+    add_event(uow, clock, 3, camera_id=2)
+    view = GetInstallations(uow).execute()
+    casa, patio, sala, escalera = nodes(view)
+    assert summary(escalera) == (2, 2, 4, "Alto")
+    assert summary(sala) == (1, 3, 4, "Alto")
+    assert summary(patio) == (1, 1, 1, "Bajo")
+    assert summary(casa) == (0, 4, 4, "Alto")
+    assert (view.pending, view.max_severity, view.priority) == (4, 4, "Alto")
+
+
+def test_a_parent_keeps_its_own_severity_when_it_is_the_highest(uow, clock):
+    add_event(uow, clock, 4)  # severity 3, in camera 1
+    add_event(uow, clock, 2, zone_id=1)  # severity 2, in its zone
+    _, _, sala, escalera = nodes(GetInstallations(uow).execute())
+    assert summary(escalera) == (1, 1, 2, "Medio")
+    assert summary(sala) == (1, 2, 3, "Alto")
+
+
+def test_each_location_only_adds_up_its_own_branch(uow, clock):
+    add_location(uow, "Bodega")  # id 2
+    add_camera(uow, "Muelle", 2)  # id 3
+    add_event(uow, clock, 3, camera_id=3)
+    add_event(uow, clock, 1)
+    view = GetInstallations(uow).execute()
+    bodega, casa = view.locations
+    assert summary(bodega) == (0, 1, 1, "Bajo")
+    assert summary(casa) == (0, 1, 4, "Alto")
+    assert (view.pending, view.max_severity) == (2, 4)
+
+
+def test_branches_without_pending_events_have_no_severity(uow, clock):
+    add_event(uow, clock, 1)
+    add_event(uow, clock, 1, camera_id=2, status="resolved")
+    _, patio, _, escalera = nodes(GetInstallations(uow).execute())
+    assert summary(patio) == summary(escalera) == (0, 0, None, None)
+
+
+def test_the_total_matches_the_pending_count_of_the_metrics(uow, clock, presenter):
+    add_event(uow, clock, 1, zone_id=1)
+    add_event(uow, clock, 2, status="in_review")
+    add_event(uow, clock, 3, zone_id=99)
+    add_event(uow, clock, 4, camera_id=2, zone_id=1)
+    add_event(uow, clock, 1, status="resolved")
+    add_event(uow, clock, 2, status="false_alarm")
+    uow.commit()
+    board = AlertBoard(10)
+    RebuildAlertBoard(uow, board, presenter).execute()
+    assert GetInstallations(uow).execute().pending == GetMetrics(uow, board).execute().pending == 4
+
+
+@pytest.mark.parametrize(
+    ("event_type_id", "severity", "priority"),
+    [(1, 4, "Alto"), (4, 3, "Alto"), (2, 2, "Medio"), (3, 1, "Bajo")],
+)
+def test_priority_follows_the_severity(uow, clock, event_type_id, severity, priority):
+    add_event(uow, clock, event_type_id)
+    view = GetInstallations(uow).execute()
+    assert (view.max_severity, view.priority) == (severity, priority)
