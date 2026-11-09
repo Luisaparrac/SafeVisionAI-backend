@@ -93,6 +93,7 @@ Un archivo por caso de uso en `application/use_cases`:
 | `UpdateCameraStatus` | `GetRecentEvents` (lista doble) |
 | `AuthenticateUser` (login con límite de intentos) | `GetSessionUser` (usuario de la sesión) |
 | `RebuildAlertBoard` (al arrancar) | `GetMetrics`, `GetEventTypeStatistics`, `GetCameraStatistics` |
+| | `GetInstallations` (árbol n-ario construido por petición) |
 | | `ListEventTypes`, `ListLocations`, `ListCameras`, `ListZones`, `ListSubjects` |
 
 ### Servicios en memoria
