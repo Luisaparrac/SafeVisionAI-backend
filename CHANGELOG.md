@@ -9,6 +9,9 @@ rutas del panel; las formas JSON se mantienen.
 ## [Sin publicar]
 
 ### Agregado
+- `GET /api/instalaciones`: ubicaciones, cámaras y zonas con sus eventos
+  pendientes y su severidad máxima, propagados hacia arriba con un árbol n-ario
+  hecho a mano (`NaryTree`). ADR 0009.
 - Registro de cuentas con `POST /api/auth/register`, en modo `closed`, `invite`
   (por defecto) u `open`, con inicio de sesión automático.
 - Recuperación de contraseña con `POST /api/auth/password/forgot` y
