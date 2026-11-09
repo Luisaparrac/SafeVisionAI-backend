@@ -29,6 +29,7 @@ expires_in
 detail
 registration
 password_recovery
+zones
 
 # Parameters of protocol (port) methods and of __exit__, which only declare a signature.
 exc_type

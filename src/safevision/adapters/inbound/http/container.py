@@ -13,6 +13,7 @@ from safevision.adapters.inbound.http.sessions import SessionPolicy
 from safevision.application.ports.readiness import ReadinessProbe
 from safevision.application.use_cases.authenticate_user import AuthenticateUser
 from safevision.application.use_cases.get_event import GetEvent
+from safevision.application.use_cases.get_installations import GetInstallations
 from safevision.application.use_cases.get_metrics import GetMetrics
 from safevision.application.use_cases.get_pending_alerts import GetPendingAlerts
 from safevision.application.use_cases.get_recent_events import GetRecentEvents
@@ -63,6 +64,7 @@ class Container:
     get_metrics: GetMetrics
     event_type_statistics: GetEventTypeStatistics
     camera_statistics: GetCameraStatistics
+    get_installations: GetInstallations
     list_event_types: ListEventTypes
     list_locations: ListLocations
     list_cameras: ListCameras

@@ -47,9 +47,11 @@ El detalle, con diagramas, está en [docs/arquitectura.md](docs/arquitectura.md)
 | Max-heap con índice de posiciones | `domain/structures/alert_priority_queue.py` | Alertas pendientes: primero la más severa y, si empatan, la más antigua. Quitar la de un evento revisado cuesta O(log n). |
 | Lista doblemente enlazada acotada | `domain/structures/event_history.py` | Historial reciente de eventos (`/api/eventos/recientes`). Insertar, descartar el más antiguo y actualizar por id cuestan O(1). |
 | Cola FIFO enlazada | `domain/structures/linked_queue.py` | Ventanas deslizantes del deduplicador de detecciones repetidas del IoT y del límite de inicios de sesión fallidos. |
+| Árbol n-ario con índice por clave | `domain/structures/nary_tree.py` | Ubicaciones, cámaras y zonas (`/api/instalaciones`). Un postorden propaga hacia arriba los pendientes y la severidad máxima. |
 
 La base de datos es la fuente de verdad: estas estructuras son índices en
-memoria que se reconstruyen desde ella al arrancar. La justificación y las
+memoria que se reconstruyen desde ella al arrancar, salvo el árbol, que se
+construye en cada petición. La justificación y las
 complejidades están en [docs/estructuras.md](docs/estructuras.md).
 
 ## Base de datos
@@ -255,6 +257,7 @@ errores, está en [docs/api.md](docs/api.md) y en `/docs` (OpenAPI).
 | GET | `/api/metricas` | Totales del panel |
 | GET | `/api/estadisticas/tipos?desde=&hasta=` | Eventos por tipo |
 | GET | `/api/estadisticas/camaras?desde=&hasta=` | Eventos por cámara |
+| GET | `/api/instalaciones` | Ubicaciones, cámaras y zonas con sus pendientes y severidad máxima |
 | GET | `/api/tipos-evento`, `/api/ubicaciones`, `/api/camaras`, `/api/zonas`, `/api/sujetos` | Catálogos de solo lectura |
 | PATCH | `/api/camaras/{id}/estado` (`X-API-Key`) | Módulo IoT: estado de una cámara |
 | WS | `/ws/alertas` | Alertas nuevas y eventos revisados en vivo |

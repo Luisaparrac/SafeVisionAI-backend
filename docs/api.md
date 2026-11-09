@@ -399,6 +399,80 @@ Empates por nombre.
 
 Empates por id.
 
+## Instalaciones
+
+### `GET /api/instalaciones`
+
+Con la sesión del panel o con la `X-API-Key`. Devuelve las ubicaciones con sus
+cámaras y sus zonas, y en cada una los eventos pendientes y su severidad máxima.
+
+```json
+{
+  "pending": 3,
+  "max_severity": 4,
+  "priority": "Alto",
+  "locations": [
+    {
+      "location_id": 1,
+      "name": "Casa",
+      "own_pending": 0,
+      "pending": 3,
+      "max_severity": 4,
+      "priority": "Alto",
+      "cameras": [
+        {
+          "camera_id": 2,
+          "name": "Patio",
+          "status": "active",
+          "own_pending": 1,
+          "pending": 1,
+          "max_severity": 2,
+          "priority": "Medio",
+          "zones": []
+        },
+        {
+          "camera_id": 1,
+          "name": "Sala",
+          "status": "active",
+          "own_pending": 1,
+          "pending": 2,
+          "max_severity": 4,
+          "priority": "Alto",
+          "zones": [
+            {
+              "zone_id": 1,
+              "name": "Escalera",
+              "own_pending": 1,
+              "pending": 1,
+              "max_severity": 4,
+              "priority": "Alto"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+| Campo | Significado |
+|---|---|
+| `pending` | Eventos pendientes del elemento y de todo lo que contiene. En la raíz coincide con `pendientes` de `/api/metricas`. |
+| `own_pending` | Pendientes contados directamente en ese elemento. En una ubicación siempre es 0, porque los eventos pertenecen a una cámara. |
+| `max_severity` | De 1 a 4, la mayor entre sus pendientes. `null` si no hay ninguno. |
+| `priority` | `Alto`, `Medio` o `Bajo` según `max_severity`. `null` si no hay pendientes. |
+
+Pendiente incluye los estados `pending` e `in_review`. Un evento cuenta en su
+zona; si no tiene, si la zona ya no existe o si pertenece a otra cámara, cuenta
+en la cámara. Cámaras, ubicaciones y zonas van ordenadas por nombre y luego por
+id, e incluyen las que no tienen pendientes.
+
+| Código | Cuándo |
+|---|---|
+| `200` | Siempre que los datos sean coherentes, también con la base vacía |
+| `401` | Sin sesión ni `X-API-Key` válida |
+| `404` | Una fila apunta a una ubicación, cámara o tipo de evento inexistente; las llaves foráneas de la base lo impiden |
+
 ## Catálogos (contrato, solo lectura)
 
 Con la sesión del panel o con la `X-API-Key` del módulo IoT, que los usa para
