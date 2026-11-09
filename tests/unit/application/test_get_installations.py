@@ -3,6 +3,7 @@ import pytest
 from safevision.application.use_cases.get_installations import GetInstallations
 from safevision.domain.errors import NotFoundError
 from safevision.domain.model.camera import Camera
+from safevision.domain.model.event import Event
 from safevision.domain.model.location import Location
 from safevision.domain.model.zone import Zone
 from tests.fakes.catalog import SQUARE
@@ -79,5 +80,70 @@ def test_a_camera_of_a_missing_location_is_reported(uow):
 
 def test_a_zone_of_a_missing_camera_is_reported(uow):
     add_zone(uow, "Perdida", 99)
+    with pytest.raises(NotFoundError, match="Cámara 99"):
+        GetInstallations(uow).execute()
+
+
+def add_event(uow, clock, event_type_id: int, camera_id: int = 1, **changes) -> None:
+    uow.events.add(
+        Event(camera_id=camera_id, event_type_id=event_type_id, occurred_at=clock.now(), **changes)
+    )
+
+
+def nodes(view):
+    [casa] = view.locations
+    patio, sala = casa.children
+    [escalera] = sala.children
+    return casa, patio, sala, escalera
+
+
+def test_an_event_with_a_zone_counts_in_the_zone(uow, clock):
+    add_event(uow, clock, 1, zone_id=1)
+    casa, patio, sala, escalera = nodes(GetInstallations(uow).execute())
+    assert (escalera.own_pending, sala.own_pending) == (1, 0)
+    assert (casa.own_pending, patio.own_pending) == (0, 0)
+
+
+def test_an_event_without_a_zone_counts_in_its_camera(uow, clock):
+    add_event(uow, clock, 2, camera_id=2)
+    _, patio, sala, _ = nodes(GetInstallations(uow).execute())
+    assert (patio.own_pending, sala.own_pending) == (1, 0)
+
+
+def test_an_event_of_a_zone_that_no_longer_exists_counts_in_its_camera(uow, clock):
+    add_event(uow, clock, 2, zone_id=99)
+    _, _, sala, escalera = nodes(GetInstallations(uow).execute())
+    assert (sala.own_pending, escalera.own_pending) == (1, 0)
+
+
+def test_an_event_with_a_zone_of_another_camera_counts_in_its_camera(uow, clock):
+    add_event(uow, clock, 2, camera_id=2, zone_id=1)
+    _, patio, _, escalera = nodes(GetInstallations(uow).execute())
+    assert (patio.own_pending, escalera.own_pending) == (1, 0)
+
+
+@pytest.mark.parametrize(
+    ("status", "counted"),
+    [("pending", 1), ("in_review", 1), ("resolved", 0), ("false_alarm", 0)],
+)
+def test_open_events_are_the_pending_ones(uow, clock, status, counted):
+    add_event(uow, clock, 1, status=status)
+    _, _, sala, _ = nodes(GetInstallations(uow).execute())
+    assert sala.own_pending == counted
+
+
+def test_an_open_event_of_a_missing_type_is_reported(uow, clock):
+    add_event(uow, clock, 99)
+    with pytest.raises(NotFoundError, match="Tipo de evento 99"):
+        GetInstallations(uow).execute()
+
+
+def test_a_closed_event_of_a_missing_type_is_ignored(uow, clock):
+    add_event(uow, clock, 99, status="resolved")
+    assert GetInstallations(uow).execute().locations
+
+
+def test_an_open_event_of_a_missing_camera_is_reported(uow, clock):
+    add_event(uow, clock, 1, camera_id=99)
     with pytest.raises(NotFoundError, match="Cámara 99"):
         GetInstallations(uow).execute()

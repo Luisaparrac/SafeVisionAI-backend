@@ -2,16 +2,25 @@
 
 A camera always hangs from one location and a zone from one camera: a row that
 points to a missing parent breaks that rule and is reported as NotFoundError,
-as the presenter does with the same references.
+as the presenter does with the same references. The same goes for an open event
+of a missing camera or event type. Skipping any of them would hide it from the
+totals, which must match the pending count of the alert queue.
+
+The zone of an event is optional. An event with no zone, with a zone that no
+longer exists or with a zone of another camera (``RegisterEvent`` rejects those)
+counts directly in its camera.
 """
 
 from dataclasses import dataclass
 from typing import Protocol
 
 from safevision.application.dto import InstallationNodeView, InstallationsView
+from safevision.application.ports.repositories import EventFilter
 from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.domain.errors import NotFoundError
+from safevision.domain.model.event import Event
 from safevision.domain.model.identity import require_id
+from safevision.domain.model.values import ReviewLabel
 from safevision.domain.structures.nary_tree import NaryTree
 
 _Key = tuple[str, int]
@@ -31,6 +40,12 @@ class _Named(Protocol):
 class _Monitored:
     name: str = ""
     status: str | None = None
+    own_pending: int = 0
+    own_severity: int | None = None
+
+    def count(self, severity: int) -> None:
+        self.own_pending += 1
+        self.own_severity = max(self.own_severity or 0, severity)
 
 
 def _by_name[T: _Named](rows: list[T]) -> list[T]:
@@ -56,6 +71,23 @@ def _hierarchy(uow: UnitOfWork) -> NaryTree[_Key, _Monitored]:
     return tree
 
 
+def _owner(tree: NaryTree[_Key, _Monitored], event: Event) -> _Monitored:
+    """The node where an event counts: its zone or, failing that, its camera."""
+    camera = tree.find((_CAMERA, event.camera_id))
+    if camera is None:
+        raise NotFoundError("Cámara", event.camera_id)
+    zone = None if event.zone_id is None else tree.find((_ZONE, event.zone_id))
+    return zone.value if zone is not None and zone.parent is camera else camera.value
+
+
+def _count_pending_events(uow: UnitOfWork, tree: NaryTree[_Key, _Monitored]) -> None:
+    severities = {t.id: t.severity.level for t in uow.event_types.list_all()}
+    for event in uow.events.find(EventFilter(statuses=ReviewLabel.PENDING.statuses)):
+        if event.event_type_id not in severities:
+            raise NotFoundError("Tipo de evento", event.event_type_id)
+        _owner(tree, event).count(severities[event.event_type_id])
+
+
 class GetInstallations:
     def __init__(self, uow: UnitOfWork) -> None:
         self._uow = uow
@@ -63,13 +95,14 @@ class GetInstallations:
     def execute(self) -> InstallationsView:
         with self._uow as uow:
             tree = _hierarchy(uow)
+            _count_pending_events(uow, tree)
         views: dict[_Key, InstallationNodeView] = {}
         for node in tree.postorder():
             views[node.key] = InstallationNodeView(
                 id=node.key[1],
                 name=node.value.name,
                 status=node.value.status,
-                own_pending=0,
+                own_pending=node.value.own_pending,
                 pending=0,
                 max_severity=None,
                 priority=None,
