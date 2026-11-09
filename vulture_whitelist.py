@@ -43,5 +43,10 @@ CHILD
 ELDERLY
 PET
 
+# The n-ary tree has no production caller yet: the next change adds it.
+NaryTree
+add_child
+postorder
+
 # logging.Logger attribute set to silence the uvicorn access log.
 _.disabled
