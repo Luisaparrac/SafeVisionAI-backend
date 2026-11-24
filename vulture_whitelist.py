@@ -30,6 +30,7 @@ detail
 registration
 password_recovery
 zones
+detected_class_label
 
 # Parameters of protocol (port) methods and of __exit__, which only declare a signature.
 exc_type

@@ -26,6 +26,10 @@ def test_register_minimal_event(client):
         "priority": "Alto",
         "status": "Pendiente",
         "description": None,
+        "detected_class": "person",
+        "detected_class_label": "Persona",
+        "confidence": None,
+        "evidence_url": None,
     }
 
 
@@ -46,6 +50,15 @@ def test_register_complete_event(client):
     assert event["location"] == "Casa · Escalera"
     assert event["priority"] == "Medio"
     assert event["description"] == "Merodeo en la escalera"
+    assert (event["detected_class"], event["detected_class_label"]) == ("dog", "Perro")
+    assert event["confidence"] == 0.5
+    assert event["evidence_url"] == "https://example.com/evidencia.jpg"
+
+
+def test_only_http_evidence_is_published(client):
+    event = post_event(client, camera_id=1, event_type_id=3, evidence_url="javascript:alert(1)")
+    assert event["evidence_url"] is None
+    assert client.get(f"/api/eventos/{event['id']}").json()["evidence_url"] is None
 
 
 def test_type_name_ignores_case_and_unknown_subject_uses_the_class(client):

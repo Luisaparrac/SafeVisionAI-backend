@@ -58,7 +58,11 @@ Forma de cada evento en todas las respuestas:
   "occurred_at": "2026-10-14T07:05:31-05:00",
   "priority": "Alto",
   "status": "Pendiente",
-  "description": "Persona en el piso"
+  "description": "Persona en el piso",
+  "detected_class": "person",
+  "detected_class_label": "Persona",
+  "confidence": 0.92,
+  "evidence_url": "https://example.com/evidencias/0001.jpg"
 }
 ```
 
@@ -71,6 +75,24 @@ Forma de cada evento en todas las respuestas:
 | `occurred_at` | El mismo instante en ISO 8601 con la zona de `TIMEZONE` (por ejemplo `2026-10-14T07:05:31-05:00`) |
 | `priority` | `Alto` (severidad 3–4), `Medio` (2) o `Bajo` (1) |
 | `status` | `Pendiente` (pending, in_review) o `Revisado` (resolved, false_alarm) |
+| `detected_class` | Lo que detectó el modelo, tal como se guardó: `person`, `dog`, `cat` u `other_animal` |
+| `detected_class_label` | Su etiqueta: `Persona`, `Perro`, `Gato` o `Animal` |
+| `confidence` | Confianza del modelo, de 0 a 1. `null` si el módulo IoT no la envió |
+| `evidence_url` | Enlace a la foto o el video de la evidencia, o `null` (ver abajo) |
+
+**Qué evidencia se publica.** `evidence_url` solo se devuelve si lo guardado es
+una URL absoluta `http` o `https` con host. Cualquier otro valor se publica como
+`null`, aunque siga guardado: rutas locales (`/evidencias/x.jpg`,
+`C:\evidencias\x.jpg`), `javascript:`, `data:`, texto vacío o mal formado. Así
+el panel puede usarla en un `src` o un `href` sin riesgo. `POST /api/eventos`
+sigue aceptando cualquier texto de hasta 500 caracteres. Si el panel se sirve
+por `https`, el navegador puede bloquear una evidencia `http` (contenido mixto),
+por eso conviene que el módulo IoT publique sus evidencias por `https`.
+
+Estos campos aparecen en todas las respuestas que incluyen un evento: las rutas
+de `/api/eventos`, `event` dentro de `/api/alertas/pendientes` y de
+`PATCH /api/alertas/{id}/vista`, y los mensajes `alerta_nueva` y
+`evento_revisado` de `/ws/alertas`.
 
 ---
 
@@ -329,7 +351,7 @@ Encabezado `X-API-Key`. Cuerpo:
 | `zone_id` | entero | No | Debe pertenecer a la cámara |
 | `detected_class` | `person` \| `dog` \| `cat` \| `other_animal` | No | Por defecto `person` |
 | `confidence` | número 0–1 | No | Confianza del modelo |
-| `evidence_url` | texto ≤ 2048 | No | Enlace a la evidencia |
+| `evidence_url` | texto ≤ 500 | No | Enlace a la evidencia; solo se publica si es `http(s)` |
 | `description` | texto ≤ 2000 | No | Texto libre; en blanco se guarda vacío (NULL) |
 
 Respuestas:

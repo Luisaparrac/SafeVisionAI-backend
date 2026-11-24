@@ -56,7 +56,7 @@ CREATE TABLE events (
   detected_class varchar NOT NULL DEFAULT 'person'
     CONSTRAINT chk_events_class CHECK (detected_class IN ('person','dog','cat','other_animal')),
   confidence numeric CONSTRAINT chk_events_confidence CHECK (confidence >= 0 AND confidence <= 1),
-  evidence_url varchar,
+  evidence_url varchar(500),
   subject_id bigint REFERENCES subjects(subject_id) ON DELETE SET NULL,
   event_type_id bigint NOT NULL REFERENCES event_types(event_type_id) ON DELETE RESTRICT,
   camera_id bigint NOT NULL REFERENCES cameras(camera_id) ON DELETE CASCADE,

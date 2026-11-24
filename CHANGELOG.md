@@ -9,6 +9,9 @@ rutas del panel; las formas JSON se mantienen.
 ## [Sin publicar]
 
 ### Agregado
+- Los eventos incluyen `detected_class`, `detected_class_label`, `confidence` y
+  `evidence_url` en todas las respuestas y en los mensajes del WebSocket. La
+  evidencia solo se publica si es una URL `http` o `https`; si no, va `null`.
 - `GET /api/instalaciones`: ubicaciones, cámaras y zonas con sus eventos
   pendientes y su severidad máxima, propagados hacia arriba con un árbol n-ario
   hecho a mano (`NaryTree`). ADR 0009.
@@ -51,6 +54,9 @@ rutas del panel; las formas JSON se mantienen.
   referencia de la API, ADR, guía de contribución y política de seguridad.
 
 ### Cambiado
+- `POST /api/eventos` acepta `evidence_url` de hasta 500 caracteres, el tamaño
+  de la columna en la base (antes 2048). Una más larga responde 422 en lugar de
+  fallar al guardarla.
 - La sesión y el ticket del WebSocket llevan una huella de la contraseña: si
   esta cambia, dejan de valer (401). Las cookies emitidas antes de esta versión
   tampoco valen, así que cada usuario debe iniciar sesión una vez más.

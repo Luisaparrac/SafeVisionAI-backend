@@ -28,7 +28,30 @@ from safevision.domain.model.zone import Zone
 class EventOut(BaseModel):
     """Shape of the RiskEvent used by the frontend (UI values in Spanish)."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": 12,
+                    "type": "Caída",
+                    "subject": "Persona sin identificar",
+                    "location": "Casa · Escalera",
+                    "camera": "Sala",
+                    "date": "2026-10-14",
+                    "time": "07:05:31",
+                    "occurred_at": "2026-10-14T07:05:31-05:00",
+                    "priority": "Alto",
+                    "status": "Pendiente",
+                    "description": "Persona en el piso junto a la escalera",
+                    "detected_class": "person",
+                    "detected_class_label": "Persona",
+                    "confidence": 0.92,
+                    "evidence_url": "https://example.com/evidencias/0001.jpg",
+                }
+            ]
+        },
+    )
 
     id: int
     type: str
@@ -41,6 +64,12 @@ class EventOut(BaseModel):
     priority: str = Field(description="Alto, Medio o Bajo")
     status: str = Field(description="Pendiente o Revisado")
     description: str | None = None
+    detected_class: str = Field(description="person, dog, cat u other_animal")
+    detected_class_label: str = Field(description="Persona, Perro, Gato o Animal")
+    confidence: float | None = Field(description="De 0 a 1; null si el módulo IoT no la envió")
+    evidence_url: str | None = Field(
+        description="URL http(s) de la foto o el video; null si no hay o no es una URL http(s)"
+    )
 
     @classmethod
     def from_view(cls, view: EventView) -> "EventOut":
@@ -75,7 +104,8 @@ class MetricsOut(BaseModel):
 
 # The columns have no limit; these keep one request from storing arbitrary amounts of text.
 MAX_DESCRIPTION_LENGTH = 2000
-MAX_EVIDENCE_URL_LENGTH = 2048
+# events.evidence_url is varchar(500): a longer link would fail on insert instead of a 422.
+MAX_EVIDENCE_URL_LENGTH = 500
 
 
 class EventIn(BaseModel):
