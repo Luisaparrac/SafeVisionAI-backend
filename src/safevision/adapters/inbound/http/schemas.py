@@ -41,6 +41,9 @@ class EventOut(BaseModel):
     priority: str = Field(description="Alto, Medio o Bajo")
     status: str = Field(description="Pendiente o Revisado")
     description: str | None = None
+    detected_class: str = Field(description="person, dog, cat u other_animal")
+    detected_class_label: str = Field(description="Persona, Perro, Gato o Animal")
+    confidence: float | None = Field(description="De 0 a 1; null si el módulo IoT no la envió")
 
     @classmethod
     def from_view(cls, view: EventView) -> "EventOut":

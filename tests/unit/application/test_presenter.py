@@ -16,7 +16,14 @@ def stored(uow, **overrides) -> Event:
 
 
 def test_full_view_with_local_time(uow, presenter):
-    event = stored(uow, subject_id=1, zone_id=1, description="Se cayó")
+    event = stored(
+        uow,
+        subject_id=1,
+        zone_id=1,
+        description="Se cayó",
+        detected_class="person",
+        confidence=0.87,
+    )
     assert presenter.present(uow, event) == EventView(
         id=1,
         type="Caída",
@@ -29,6 +36,9 @@ def test_full_view_with_local_time(uow, presenter):
         priority="Alto",
         status="Pendiente",
         description="Se cayó",
+        detected_class="person",
+        detected_class_label="Persona",
+        confidence=0.87,
     )
 
 
@@ -55,6 +65,29 @@ def test_priority_from_event_type_severity(uow, presenter, event_type_id, priori
 )
 def test_status_label(uow, presenter, status, label):
     assert presenter.present(uow, stored(uow, status=status)).status == label
+
+
+@pytest.mark.parametrize(
+    ("detected_class", "label"),
+    [("person", "Persona"), ("dog", "Perro"), ("cat", "Gato"), ("other_animal", "Animal")],
+)
+def test_detected_class_and_its_label(uow, presenter, detected_class, label):
+    view = presenter.present(uow, stored(uow, detected_class=detected_class))
+    assert (view.detected_class, view.detected_class_label) == (detected_class, label)
+
+
+@pytest.mark.parametrize("confidence", [0, 0.5, 1])
+def test_confidence_as_stored(uow, presenter, confidence):
+    assert presenter.present(uow, stored(uow, confidence=confidence)).confidence == confidence
+
+
+def test_without_confidence_and_class_the_defaults_are_shown(uow, presenter):
+    view = presenter.present(uow, stored(uow))
+    assert (view.detected_class, view.detected_class_label, view.confidence) == (
+        "person",
+        "Persona",
+        None,
+    )
 
 
 def test_deleted_subject_and_zone_are_tolerated(uow, presenter):

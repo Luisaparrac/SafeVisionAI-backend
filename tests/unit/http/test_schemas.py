@@ -22,6 +22,9 @@ VIEW = EventView(
     priority="Alto",
     status="Pendiente",
     description=None,
+    detected_class="person",
+    detected_class_label="Persona",
+    confidence=0.9,
 )
 VIEW_JSON = {
     "id": 7,
@@ -35,6 +38,9 @@ VIEW_JSON = {
     "priority": "Alto",
     "status": "Pendiente",
     "description": None,
+    "detected_class": "person",
+    "detected_class_label": "Persona",
+    "confidence": 0.9,
 }
 
 

@@ -48,6 +48,9 @@ EVENT_KEYS = {
     "priority",
     "status",
     "description",
+    "detected_class",
+    "detected_class_label",
+    "confidence",
 }
 
 

@@ -123,4 +123,7 @@ class EventPresenter:
             priority=event_type.priority.value,
             status=event.status.label.value,
             description=event.description,
+            detected_class=event.detected_class.value,
+            detected_class_label=event.detected_class.label,
+            confidence=None if event.confidence is None else event.confidence.value,
         )

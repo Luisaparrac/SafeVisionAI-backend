@@ -36,6 +36,9 @@ VIEW = EventView(
     priority="Alto",
     status="Pendiente",
     description=None,
+    detected_class="person",
+    detected_class_label="Persona",
+    confidence=0.9,
 )
 
 

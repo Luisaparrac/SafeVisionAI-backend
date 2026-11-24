@@ -26,6 +26,9 @@ def test_register_minimal_event(client):
         "priority": "Alto",
         "status": "Pendiente",
         "description": None,
+        "detected_class": "person",
+        "detected_class_label": "Persona",
+        "confidence": None,
     }
 
 
@@ -46,6 +49,8 @@ def test_register_complete_event(client):
     assert event["location"] == "Casa · Escalera"
     assert event["priority"] == "Medio"
     assert event["description"] == "Merodeo en la escalera"
+    assert (event["detected_class"], event["detected_class_label"]) == ("dog", "Perro")
+    assert event["confidence"] == 0.5
 
 
 def test_type_name_ignores_case_and_unknown_subject_uses_the_class(client):
