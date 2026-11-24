@@ -9,6 +9,9 @@ rutas del panel; las formas JSON se mantienen.
 ## [Sin publicar]
 
 ### Agregado
+- Los eventos incluyen `detected_class`, `detected_class_label`, `confidence` y
+  `evidence_url` en todas las respuestas y en los mensajes del WebSocket. La
+  evidencia solo se publica si es una URL `http` o `https`; si no, va `null`.
 - `GET /api/instalaciones`: ubicaciones, cámaras y zonas con sus eventos
   pendientes y su severidad máxima, propagados hacia arriba con un árbol n-ario
   hecho a mano (`NaryTree`). ADR 0009.
