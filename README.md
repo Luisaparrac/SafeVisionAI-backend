@@ -294,8 +294,10 @@ Content-Type: application/json
 - `detected_class`: `person`, `dog`, `cat` u `other_animal`. `confidence`: 0 a 1.
 - `zone_id` debe pertenecer a la cámara. `description` admite hasta 2000
   caracteres y `evidence_url` hasta 2048; el cuerpo completo, hasta 64 KiB.
+  La evidencia solo se devuelve al panel si es una URL `http` o `https`.
 - Responde **201** con el evento (`id, type, subject, location, camera, date,
-  time, occurred_at, priority, status, description`) y crea su alerta con
+  time, occurred_at, priority, status, description, detected_class,
+  detected_class_label, confidence, evidence_url`) y crea su alerta con
   `level = severidad del tipo`.
 - Una detección repetida (misma cámara, tipo y sujeto) dentro de
   `DEDUP_WINDOW_SECONDS` responde **201 con el evento ya registrado** y el
