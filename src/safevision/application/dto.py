@@ -22,6 +22,7 @@ class EventView:
     detected_class: str  # person / dog / cat / other_animal, as stored
     detected_class_label: str  # Persona / Perro / Gato / Animal
     confidence: float | None  # 0 to 1; None when the IoT module did not send it
+    evidence_url: str | None  # only absolute http(s) URLs (see evidence_url.py)
 
 
 @dataclass(frozen=True)

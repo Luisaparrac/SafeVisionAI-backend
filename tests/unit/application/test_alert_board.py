@@ -25,6 +25,7 @@ def view(event_id: int, status: str = "Pendiente") -> EventView:
         "person",
         "Persona",
         None,
+        None,
     )
 
 

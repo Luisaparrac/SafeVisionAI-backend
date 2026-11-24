@@ -25,6 +25,7 @@ VIEW = EventView(
     detected_class="person",
     detected_class_label="Persona",
     confidence=0.9,
+    evidence_url="https://example.com/evidencias/0007.jpg",
 )
 VIEW_JSON = {
     "id": 7,
@@ -41,6 +42,7 @@ VIEW_JSON = {
     "detected_class": "person",
     "detected_class_label": "Persona",
     "confidence": 0.9,
+    "evidence_url": "https://example.com/evidencias/0007.jpg",
 }
 
 

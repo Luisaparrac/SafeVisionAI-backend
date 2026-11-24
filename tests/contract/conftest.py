@@ -51,6 +51,7 @@ EVENT_KEYS = {
     "detected_class",
     "detected_class_label",
     "confidence",
+    "evidence_url",
 }
 
 

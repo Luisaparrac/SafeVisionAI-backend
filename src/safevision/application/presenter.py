@@ -3,6 +3,7 @@
 from datetime import tzinfo
 
 from safevision.application.dto import AlertView, EventView
+from safevision.application.evidence_url import public_evidence_url
 from safevision.application.ports.unit_of_work import UnitOfWork
 from safevision.domain.errors import NotFoundError
 from safevision.domain.model.alert import Alert
@@ -126,4 +127,5 @@ class EventPresenter:
             detected_class=event.detected_class.value,
             detected_class_label=event.detected_class.label,
             confidence=None if event.confidence is None else event.confidence.value,
+            evidence_url=public_evidence_url(event.evidence_url),
         )
