@@ -54,6 +54,9 @@ rutas del panel; las formas JSON se mantienen.
   referencia de la API, ADR, guía de contribución y política de seguridad.
 
 ### Cambiado
+- `POST /api/eventos` acepta `evidence_url` de hasta 500 caracteres, el tamaño
+  de la columna en la base (antes 2048). Una más larga responde 422 en lugar de
+  fallar al guardarla.
 - La sesión y el ticket del WebSocket llevan una huella de la contraseña: si
   esta cambia, dejan de valer (401). Las cookies emitidas antes de esta versión
   tampoco valen, así que cada usuario debe iniciar sesión una vez más.

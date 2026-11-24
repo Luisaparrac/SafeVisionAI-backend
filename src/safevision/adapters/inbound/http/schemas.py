@@ -104,7 +104,8 @@ class MetricsOut(BaseModel):
 
 # The columns have no limit; these keep one request from storing arbitrary amounts of text.
 MAX_DESCRIPTION_LENGTH = 2000
-MAX_EVIDENCE_URL_LENGTH = 2048
+# events.evidence_url is varchar(500): a longer link would fail on insert instead of a 422.
+MAX_EVIDENCE_URL_LENGTH = 500
 
 
 class EventIn(BaseModel):

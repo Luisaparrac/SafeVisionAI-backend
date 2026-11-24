@@ -3,6 +3,7 @@
 import pytest
 from sqlalchemy.orm import Session
 
+from safevision.adapters.inbound.http.schemas import MAX_EVIDENCE_URL_LENGTH
 from safevision.adapters.outbound.persistence.database import make_session_factory
 from safevision.adapters.outbound.persistence.orm import EventRow
 from safevision.adapters.outbound.persistence.unit_of_work import SqlAlchemyUnitOfWork
@@ -58,3 +59,25 @@ def test_a_stored_unsafe_link_is_kept_but_not_published(client, pg_seeded):
     assert client.get(f"/api/eventos/{created['id']}").json()["evidence_url"] is None
     with Session(pg_seeded) as session:
         assert session.get(EventRow, created["id"]).evidence_url == "javascript:alert(1)"
+
+
+def link_of(length: int) -> str:
+    prefix = "https://example.com/evidencias/"
+    return prefix + "a" * (length - len(prefix))
+
+
+def test_the_longest_link_the_column_accepts_is_stored(client, pg_seeded):
+    link = link_of(500)
+    created = register(client, evidence_url=link)
+    assert client.get(f"/api/eventos/{created['id']}").json()["evidence_url"] == link
+    with Session(pg_seeded) as session:
+        assert session.get(EventRow, created["id"]).evidence_url == link
+
+
+def test_a_longer_link_is_rejected_before_reaching_the_database(client, pg_seeded):
+    assert MAX_EVIDENCE_URL_LENGTH == 500
+    body = {"camera_id": 1, "event_type_id": 1, "evidence_url": link_of(501)}
+    response = client.post("/api/eventos", json=body, headers=KEY)
+    assert response.status_code == 422
+    with Session(pg_seeded) as session:
+        assert session.query(EventRow).count() == 0

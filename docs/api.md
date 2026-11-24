@@ -85,7 +85,7 @@ una URL absoluta `http` o `https` con host. Cualquier otro valor se publica como
 `null`, aunque siga guardado: rutas locales (`/evidencias/x.jpg`,
 `C:\evidencias\x.jpg`), `javascript:`, `data:`, texto vacío o mal formado. Así
 el panel puede usarla en un `src` o un `href` sin riesgo. `POST /api/eventos`
-sigue aceptando cualquier texto de hasta 2048 caracteres. Si el panel se sirve
+sigue aceptando cualquier texto de hasta 500 caracteres. Si el panel se sirve
 por `https`, el navegador puede bloquear una evidencia `http` (contenido mixto),
 por eso conviene que el módulo IoT publique sus evidencias por `https`.
 
@@ -351,7 +351,7 @@ Encabezado `X-API-Key`. Cuerpo:
 | `zone_id` | entero | No | Debe pertenecer a la cámara |
 | `detected_class` | `person` \| `dog` \| `cat` \| `other_animal` | No | Por defecto `person` |
 | `confidence` | número 0–1 | No | Confianza del modelo |
-| `evidence_url` | texto ≤ 2048 | No | Enlace a la evidencia; solo se publica si es `http(s)` |
+| `evidence_url` | texto ≤ 500 | No | Enlace a la evidencia; solo se publica si es `http(s)` |
 | `description` | texto ≤ 2000 | No | Texto libre; en blanco se guarda vacío (NULL) |
 
 Respuestas:
